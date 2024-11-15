@@ -1,23 +1,22 @@
-# seqmorph_main.py: Main program for SeqMorph
-
 from input_module import InputHandler
 from mutation_engine import MutationEngine
+from export_module import ExportHandler  # Ensure this is imported
 
 def main():
     print("Welcome to SeqMorph: A Sequence Mutation Simulator")
 
     # Input Handling
     handler = InputHandler()
-    
+
     # Get sequence input
-    print("Do you want to load sequences from files or enter them manually?")
+    print("How would you like to input sequences?")
     print("1. Load from files (batch processing)")
     print("2. Enter a single sequence manually")
-    choice = input("Enter your choice (1 or 2): ")
+    choice = input("Enter your choice (1 or 2): ").strip()
 
     sequences = []
     if choice == "1":
-        print("Select multiple files containing sequences.")
+        print("Select input files with sequences.")
         file_paths = handler.select_multiple_files()
         if not file_paths:
             print("No files selected. Exiting.")
@@ -41,7 +40,7 @@ def main():
     for idx, sequence in enumerate(sequences, 1):
         print(f"\nProcessing sequence {idx}: {sequence}")
         try:
-            sequence_type = handler.detect_sequence_type(sequence)
+            sequence_type = handler._detect_sequence_type(sequence)
             print(f"Detected sequence type: {sequence_type}")
         except Exception as e:
             print(f"Error detecting sequence type: {e}")
@@ -97,7 +96,7 @@ def main():
                 output_file = input(f"Enter output file name for sequence {idx}, run {run} (default: mutated_output_{idx}_run{run}.txt): ").strip()
                 output_file = output_file if output_file else f"mutated_output_{idx}_run{run}.txt"
                 try:
-                    MutationEngine.export_mutation(sequence, mutated_sequence, output_file)
+                    ExportHandler.export_sequence(sequence, mutated_sequence, output_file, f"Sequence_{idx}_Run_{run}")
                     print(f"Mutated sequence saved to {output_file}")
                 except Exception as e:
                     print(f"Error saving file: {e}")

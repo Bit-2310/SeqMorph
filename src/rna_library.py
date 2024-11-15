@@ -88,15 +88,3 @@ class RNAUtils:
                 break
             protein.append(amino_acid)
         return ''.join(protein)
-
-if __name__ == "__main__":
-    dna_sequence = "ATGCGTACGTTAGC"
-    print("Original DNA Sequence:", dna_sequence)
-    print("Transcribed RNA Sequence:", RNAUtils.transcribe(dna_sequence))
-
-    rna_sequence = "AUGCGUACAGUUCAGCACGUAGCUAGAGCUAGCUAGCUAGCGUUAGC"
-    print("Original RNA Sequence:", rna_sequence)
-    print("Reverse Transcribed DNA Sequence:", RNAUtils.reverse_transcribe(rna_sequence))
-    print("GC Content (%):", RNAUtils.gc_content(rna_sequence))
-   # print("Codons:", RNAUtils.codon_splitter(rna_sequence))
-    print("Translated Protein:", RNAUtils.translate(rna_sequence))

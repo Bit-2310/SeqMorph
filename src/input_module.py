@@ -59,22 +59,29 @@ class InputHandler:
         except Exception as e:
             raise ValueError(f"Error reading file: {str(e)}")
 
-    def detect_sequence_type(self, sequence):
-        dna_bases = set("ATGC")
-        rna_bases = set("AUGC")
-        protein_bases = set("ACDEFGHIKLMNPQRSTVWY")
+    @staticmethod
+    def _detect_sequence_type(sequence):
+        """
+        Detect the type of a sequence (DNA, RNA, Protein).
 
-        sequence_set = set(sequence.upper())
+        Args:
+            sequence (str): The input sequence to analyze.
 
-        if sequence_set.issubset(dna_bases):
+        Returns:
+            str: The type of sequence ('DNA', 'RNA', 'Protein').
+
+        Raises:
+            ValueError: If the sequence type cannot be determined.
+        """
+        if set(sequence.upper()).issubset("ATGC"):
             return "DNA"
-        elif sequence_set.issubset(rna_bases):
+        elif set(sequence.upper()).issubset("AUGC"):
             return "RNA"
-        elif sequence_set.issubset(protein_bases):
+        elif set(sequence.upper()).issubset("ACDEFGHIKLMNPQRSTVWY"):
             return "Protein"
         else:
-            raise ValueError("Invalid sequence: Cannot determine type.")
-
+            raise ValueError("Cannot detect sequence type.")
+        
     def fetch_sequence_ncbi(self, accession_id):
         url = f"https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={accession_id}&report=fasta"
         try:
@@ -98,33 +105,3 @@ class InputHandler:
             return sequence_data
         except Exception as e:
             raise ValueError(f"Error fetching sequence from UniProt: {str(e)}")
-
-if __name__ == "__main__":
-    handler = InputHandler()
-
-    # Example: Load sequence from file
-    try:
-        file_path = handler.select_file()
-        sequence = handler.load_sequence_file(file_path)
-        print("Loaded sequence:", sequence)
-        print("Detected type:", handler.detect_sequence_type(sequence))
-    except Exception as e:
-        print("Error:", e)
-
-    # Example: Fetch sequence from NCBI
-    try:
-        accession_id = input("Enter NCBI accession ID: ").strip()
-        sequence = handler.fetch_sequence_ncbi(accession_id)
-        print("Fetched sequence from NCBI:", sequence)
-        print("Detected type:", handler.detect_sequence_type(sequence))
-    except Exception as e:
-        print("Error:", e)
-
-    # Example: Fetch sequence from UniProt
-    try:
-        uniprot_id = input("Enter UniProt ID: ").strip()
-        sequence = handler.fetch_sequence_uniprot(uniprot_id)
-        print("Fetched sequence from UniProt:", sequence)
-        print("Detected type:", handler.detect_sequence_type(sequence))
-    except Exception as e:
-        print("Error:", e)

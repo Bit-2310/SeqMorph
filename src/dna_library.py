@@ -26,11 +26,3 @@ class DNAtoRNA:
     @staticmethod
     def rev_transcribe(sequence):
         return sequence.upper().replace("T", "U")
-
-if __name__ == "__main__":
-    sequence = "ATGCGTACGTTAGC"
-    print("Original Sequence:", sequence)
-    print("Complement:", DNAUtils.complement(sequence))
-    print("Reverse Complement:", DNAUtils.reverse_complement(sequence))
-    print("GC Content (%):", DNAUtils.gc_content(sequence))
-    print("Nucleotide Frequency:", DNAUtils.nucleotide_frequency(sequence))

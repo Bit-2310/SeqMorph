@@ -1,47 +1,55 @@
-
 # SeqMorph
-
-SeqMorph is a powerful tool for simulating mutations in DNA, RNA, and protein sequences. Designed for bioinformatics enthusiasts and researchers, SeqMorph helps you explore how mutations impact sequences, their biological functions, and downstream analyses.
+SeqMorph is a bioinformatics tool designed for simulating mutations in DNA, RNA, and protein sequences. It allows users to explore the impact of mutations on sequences and their biological functions. With an interactive interface, batch processing support, and detailed analysis features, SeqMorph is ideal for researchers and bioinformatics enthusiasts.
 
 ---
 
 ## **Key Features**
 
-- **Sequence Type Detection**: Automatically detects whether a sequence is DNA, RNA, or protein.
-- **Custom Mutations**: Simulate random or region-specific mutations in your sequences.
+- **Sequence Type Detection**: Automatically detects whether the input is DNA, RNA, or protein.
+- **Custom Mutations**: Perform substitutions, insertions, deletions, or frameshift mutations.
+- **Batch Processing**: Apply mutations to multiple sequences in a single run.
 - **Sense/Antisense Detection**: Identify whether RNA strands are sense or antisense.
 - **Sequence Analysis**:
   - Calculate GC content for DNA and RNA.
   - Reverse transcription for RNA.
   - Complement and reverse complement for DNA.
   - Hydrophobicity scoring for proteins.
-- **Interactive File Management**: Use a file manager to select sequence files dynamically.
-- **Extensibility**: Modular design allows easy addition of new features and tools.
+- **Dynamic File Input**:
+  - Select `.fasta` or `.txt` files through an interactive file manager.
+  - Retrieve sequences from NCBI or UniProt using accession numbers.
+  - Enter sequences manually.
+- **Mutation Attributes**: Track mutation logs with details such as positions, types, and original vs mutated bases.
+- **Export**:
+  - Save detailed outputs, including sequence attributes and mutation logs, in a structured file format.
 
 ---
 
 ## **How It Works**
 
 1. **Input Handling**:
-   - Upload `.fasta` or `.txt` sequence files.
-   - Automatically validate and parse the sequences.
+   - Choose from multiple input methods: file upload, accession number, or manual entry.
+   - Validate and parse sequences automatically.
 
 2. **Mutation Simulation**:
-   - Introduce substitutions, insertions, deletions, or frameshifts.
-   - Specify mutation rates or apply mutations to specific regions.
+   - Specify mutation type (`substitute`, `insert`, `delete`, `frameshift`).
+   - Define mutation rate (default : 10%)
+   - Apply mutations range to full sequences or specific regions (start index and end index).
 
 3. **Analysis**:
-   - Explore sequence-level features (e.g., GC content, complement).
-   - Visualize mutation density or sequence changes.
+   - Explore sequence-level features:
+          - including GC content
+          - nucleotide frequency
+          - hydrophobicity, and more (coming soon).
+   - Highlight mutations compared to the original sequence.
 
 4. **Export**:
-   - Save mutated sequences and logs for further analysis.
+   - Save original and mutated sequences, along with their attributes, in a detailed file.
 
 ---
 
 ## **Installation**
 
-SeqMorph requires Python 3.8 or above. To get started:
+SeqMorph requires Python 3.8 or higher. To install:
 
 1. Clone the repository:
    ```bash
@@ -59,46 +67,51 @@ SeqMorph requires Python 3.8 or above. To get started:
 
 ### **Run the Tool**
 ```bash
-python src/seqmorph_main.py
+python src/SeqMorph\ Main.py
 ```
 
 ### **Example Input Files**
-1. `test.fasta`:
+1. `example_dna.fasta`:
    ```
    >Example DNA Sequence
    ATGCGTACGTTAGC
    ```
-2. `test.txt`:
+2. `example_rna.txt`:
    ```
    AUGGCCAUGGCGCCCAGAACUGAGAUCAAUAGUACCCGUAUUAACGGGUGA
    ```
-3. `protein_test.txt`:
+3. `example_protein.txt`:
    ```
    MAMAPRTEINSTRING
    ```
 
 ### **Features in Action**
-- Select a file using the interactive file manager.
-- Detect the sequence type (DNA, RNA, or Protein).
-- Perform sequence-specific operations, such as:
-  - DNA: Complement, reverse complement, and GC content.
-  - RNA: Reverse transcription, GC content, sense/antisense strand detection.
-  - Protein: Hydrophobicity scoring.
+
+1. Select a sequence source:
+   - File upload.
+   - Manual sequence entry.
+2. Detect sequence type (DNA, RNA, or protein).
+3. Choose mutation type, rate, and target regions.
+4. Analyze sequence attributes:
+   - DNA/RNA: GC content, nucleotide frequency, complement, reverse complement.
+   - Protein: Hydrophobicity score.
+5. Export results:
+   - Save the original and mutated sequences, along with their attributes and mutation logs, to a structured output file.
 
 ---
 
 ## **Planned Features**
 
-- Advanced mutation engine for precise simulations.
-- Visualizations for mutation density and sequence alignments.
-- CLI support for batch processing.
-- Integration with databases like NCBI GenBank and UniProt.
+- Visualizations for mutation density and sequence changes.
+- Advanced alignment tools for comparing original and mutated sequences.
+- Integration with online databases for automated data retrieval. (* Currently W.I.P)
+- Enhanced reporting with customizable export formats (e.g., CSV, JSON).
 
 ---
 
 ## **Contributing**
 
-Contributions are welcome! Feel free to fork the repository, make changes, and submit a pull request. Please ensure your code follows the established coding guidelines and includes relevant tests.
+Contributions are welcome! Fork the repository, create a new branch, make your changes, and submit a pull request. Ensure that your code adheres to the project's coding standards and includes relevant tests.
 
 ---
 

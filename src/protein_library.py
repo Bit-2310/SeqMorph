@@ -30,9 +30,3 @@ class ProteinUtils:
         }
 
         return ''.join(codon_map.get(aa, 'NNN') for aa in protein_sequence)
-
-if __name__ == "__main__":
-    protein_sequence = "ACDEFGHIKLMNPQRSTVWY"
-    print("Original Protein Sequence:", protein_sequence)
-    print("Hydrophobicity Score:", ProteinUtils.hydrophobicity(protein_sequence))
-    print("Mock RNA Sequence:", ProteinUtils.protein_to_rna(protein_sequence))
