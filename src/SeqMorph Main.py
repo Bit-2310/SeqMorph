@@ -1,6 +1,6 @@
 from input_module import InputHandler
-from mutation_engine import MutationEngine
-from export_module import ExportHandler  # Ensure this is imported
+from mutation_engine import MutationEngine, MutationUtils
+from export_module import ExportHandler
 
 def main():
     print("Welcome to SeqMorph: A Sequence Mutation Simulator")
@@ -28,7 +28,7 @@ def main():
             print(f"Error loading files: {e}")
             return
     elif choice == "2":
-        sequence = input("Enter your sequence: ").strip()
+        sequence = input("Enter your sequence: ").strip().upper()
         if not sequence:
             print("No sequence entered. Exiting.")
             return
@@ -40,13 +40,13 @@ def main():
     for idx, sequence in enumerate(sequences, 1):
         print(f"\nProcessing sequence {idx}: {sequence}")
         try:
-            sequence_type = handler._detect_sequence_type(sequence)
+            sequence_type = handler.sequence_type(sequence)
             print(f"Detected sequence type: {sequence_type}")
         except Exception as e:
             print(f"Error detecting sequence type: {e}")
             continue
 
-        # Ask how many times to run the program for this sequence
+        # Mutation configuration
         repeat_times = input("How many times do you want to run mutations on this sequence? (default: 1): ").strip()
         repeat_times = int(repeat_times) if repeat_times.isdigit() else 1
 
@@ -70,10 +70,10 @@ def main():
             mutation_rate = float(mutation_rate) if mutation_rate else 10.0
 
             start = input("Enter start position for mutation range (optional): ").strip()
-            start = int(start) if start else None
+            start = int(start) - 1 if start.isdigit() else None
 
             end = input("Enter end position for mutation range (optional): ").strip()
-            end = int(end) if end else None
+            end = int(end) if end.isdigit() else None
 
             try:
                 mutated_sequence = MutationEngine.mutate(
@@ -87,13 +87,17 @@ def main():
             # Highlight Mutations
             highlight_choice = input("Do you want to highlight the mutations? (y/n): ").strip().lower()
             if highlight_choice == "y":
-                highlighted_sequence = MutationEngine.highlight_mutations(sequence, mutated_sequence)
-                print(f"Highlighted Mutations: {highlighted_sequence}")
+                try:
+                    highlighted_sequence = MutationEngine.highlight_mutations(sequence, mutated_sequence)
+                    print(f"Highlighted Mutations: {highlighted_sequence}")
+                except Exception as e:
+                    print(f"Error highlighting mutations: {e}")
 
             # Export Results
             export_choice = input("Do you want to save the mutated sequence to a file? (y/n): ").strip().lower()
             if export_choice == "y":
-                output_file = input(f"Enter output file name for sequence {idx}, run {run} (default: mutated_output_{idx}_run{run}.txt): ").strip()
+                output_file = input(
+                    f"Enter output file name for sequence {idx}, run {run} (default: mutated_output_{idx}_run{run}.txt): ").strip()
                 output_file = output_file if output_file else f"mutated_output_{idx}_run{run}.txt"
                 try:
                     ExportHandler.export_sequence(sequence, mutated_sequence, output_file, f"Sequence_{idx}_Run_{run}")

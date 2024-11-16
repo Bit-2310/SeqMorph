@@ -7,6 +7,8 @@ SeqMorph is a bioinformatics tool designed for simulating mutations in DNA, RNA,
 
 - **Sequence Type Detection**: Automatically detects whether the input is DNA, RNA, or protein.
 - **Custom Mutations**: Perform substitutions, insertions, deletions, or frameshift mutations.
+- **Unified Gene Library**: Handles both DNA and RNA sequence operations, reducing duplicate code.
+- **Custom Mutations**: Perform substitutions, insertions, deletions, frameshift mutations, and point mutations with transition/transversion probability weights.
 - **Batch Processing**: Apply mutations to multiple sequences in a single run.
 - **Sense/Antisense Detection**: Identify whether RNA strands are sense or antisense.
 - **Sequence Analysis**:
@@ -31,15 +33,16 @@ SeqMorph is a bioinformatics tool designed for simulating mutations in DNA, RNA,
    - Validate and parse sequences automatically.
 
 2. **Mutation Simulation**:
-   - Specify mutation type (`substitute`, `insert`, `delete`, `frameshift`).
-   - Define mutation rate (default : 10%)
-   - Apply mutations range to full sequences or specific regions (start index and end index).
+   - Specify mutation type (`substitute`, `insert`, `delete`, `frameshift`, `silent`, `missense`, `nonsense`).
+   - Define mutation rate (default: 10%).
+   - Apply mutations to full sequences or specific regions (start index and end index).
 
 3. **Analysis**:
    - Explore sequence-level features:
-          - including GC content
-          - nucleotide frequency
-          - hydrophobicity, and more (coming soon).
+     - GC content.
+     - Nucleotide frequency.
+     - Hydrophobicity.
+     - Transition/transversion ratio.
    - Highlight mutations compared to the original sequence.
 
 4. **Export**:
@@ -93,7 +96,7 @@ python src/SeqMorph\ Main.py
 2. Detect sequence type (DNA, RNA, or protein).
 3. Choose mutation type, rate, and target regions.
 4. Analyze sequence attributes:
-   - DNA/RNA: GC content, nucleotide frequency, complement, reverse complement.
+   - DNA/RNA: GC content, nucleotide frequency, complement, reverse complement, transition/transversion counts.
    - Protein: Hydrophobicity score.
 5. Export results:
    - Save the original and mutated sequences, along with their attributes and mutation logs, to a structured output file.
@@ -104,7 +107,7 @@ python src/SeqMorph\ Main.py
 
 - Visualizations for mutation density and sequence changes.
 - Advanced alignment tools for comparing original and mutated sequences.
-- Integration with online databases for automated data retrieval. (* Currently W.I.P)
+- Integration with online databases for automated data retrieval (*Currently W.I.P*).
 - Enhanced reporting with customizable export formats (e.g., CSV, JSON).
 
 ---

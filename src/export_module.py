@@ -1,5 +1,4 @@
-from dna_library import DNAUtils
-from rna_library import RNAUtils
+from gene_library import GeneUtils
 from protein_library import ProteinUtils
 from input_module import InputHandler
 class ExportHandler:
@@ -24,8 +23,8 @@ class ExportHandler:
             hydrophobicity = None
 
             if sequence_type in ["DNA", "RNA"]:
-                gc_content = RNAUtils.gc_content(sequence) if sequence_type == "RNA" else DNAUtils.gc_content(sequence)
-                nucleotide_frequency = DNAUtils.nucleotide_frequency(sequence) if sequence_type == "DNA" else None
+                gc_content = GeneUtils.gc_content(sequence) if sequence_type == "RNA" else GeneUtils.gc_content(sequence)
+                nucleotide_frequency = GeneUtils.nucleotide_frequency(sequence) if sequence_type == "DNA" else None
             elif sequence_type == "Protein":
                 hydrophobicity = ProteinUtils.hydrophobicity(sequence)
 

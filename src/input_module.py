@@ -60,7 +60,7 @@ class InputHandler:
             raise ValueError(f"Error reading file: {str(e)}")
 
     @staticmethod
-    def _detect_sequence_type(sequence):
+    def sequence_type(sequence):
         """
         Detect the type of a sequence (DNA, RNA, Protein).
 
