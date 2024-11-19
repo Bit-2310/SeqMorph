@@ -1,41 +1,51 @@
-# input_module.py: Handles file uploads and sequence retrieval for SeqMorph
-
 import os
 from Bio import SeqIO
 from tkinter import Tk, filedialog
 import requests
+from gene_library import SequenceValidation
+
 
 class InputHandler:
-    def __init__(self):
-        pass
+    """
+    Handles user input for sequences through file uploads or direct entry.
+    """
+    SUPPORTED_FILETYPES = [
+        ("FASTA Files", "*.fasta"),
+        ("Text Files", "*.txt"),
+        ("All Files", "*.*")
+    ]
 
     def select_file(self):
-        root = Tk()  # Create the root window
+        """
+        Open a file dialog to select a single file.
+        :return: Path of the selected file.
+        """
+        root = Tk()
         root.withdraw()  # Hide the root window
-        file_path = filedialog.askopenfilename(
+        return filedialog.askopenfilename(
             title="Select a Sequence File",
-            filetypes=(
-                ("FASTA Files", "*.fasta"),
-                ("Text Files", "*.txt"),
-                ("All Files", "*.*")
-            )
+            filetypes=self.SUPPORTED_FILETYPES
         )
-        return file_path
 
     def select_multiple_files(self):
-        root = Tk()  # Create the root window
+        """
+        Open a file dialog to select multiple files.
+        :return: List of paths for the selected files.
+        """
+        root = Tk()
         root.withdraw()  # Hide the root window
-        file_paths = filedialog.askopenfilenames(
+        return filedialog.askopenfilenames(
             title="Select Sequence Files",
-            filetypes=(
-                ("FASTA Files", "*.fasta"),
-                ("Text Files", "*.txt"),
-                ("All Files", "*.*")
-            )
+            filetypes=self.SUPPORTED_FILETYPES
         )
-        return file_paths
 
     def load_sequence_file(self, filepath):
+        """
+        Load and parse a sequence file.
+        Supports `.fasta` and `.txt` file formats.
+        :param filepath: Path to the sequence file.
+        :return: List of sequences from the file.
+        """
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
@@ -45,63 +55,105 @@ class InputHandler:
 
         try:
             if file_extension == ".fasta":
-                with open(filepath, "r") as file:
-                    sequences = [str(record.seq) for record in SeqIO.parse(file, "fasta")]
-                    if not sequences:
-                        raise ValueError("No sequences found in the FASTA file.")
-                    return sequences[0]  # Return the first sequence
+                return self._parse_fasta(filepath)
             elif file_extension == ".txt":
-                with open(filepath, "r") as file:
-                    sequence = file.read().strip()
-                    if not sequence:
-                        raise ValueError("No content found in the TXT file.")
-                    return sequence
+                return self._parse_text(filepath)
         except Exception as e:
-            raise ValueError(f"Error reading file: {str(e)}")
+            raise ValueError(f"Error reading file {filepath}: {str(e)}")
 
+    @staticmethod
+    def _parse_fasta(filepath):
+        """
+        Parse a FASTA file to extract sequences.
+        :param filepath: Path to the FASTA file.
+        :return: List of sequences from the file.
+        """
+        sequences = [str(record.seq) for record in SeqIO.parse(filepath, "fasta")]
+        if not sequences:
+            raise ValueError("No sequences found in the FASTA file.")
+        return sequences
+
+    @staticmethod
+    def _parse_text(filepath):
+        """
+        Parse a plain text file to extract a sequence.
+        :param filepath: Path to the text file.
+        :return: List containing a single sequence.
+        """
+        with open(filepath, "r") as file:
+            sequence = file.read().strip()
+            if not sequence:
+                raise ValueError("No content found in the TXT file.")
+            return [sequence]
+        
     @staticmethod
     def sequence_type(sequence):
         """
-        Detect the type of a sequence (DNA, RNA, Protein).
-
-        Args:
-            sequence (str): The input sequence to analyze.
-
-        Returns:
-            str: The type of sequence ('DNA', 'RNA', 'Protein').
-
-        Raises:
-            ValueError: If the sequence type cannot be determined.
+        Determine the type of sequence (DNA, RNA, or Protein) and validate it.
+        :param sequence: Input sequence string.
+        :return: The type of sequence ('DNA', 'RNA', 'Protein').
         """
-        if set(sequence.upper()).issubset("ATGC"):
-            return "DNA"
-        elif set(sequence.upper()).issubset("AUGC"):
-            return "RNA"
-        elif set(sequence.upper()).issubset("ACDEFGHIKLMNPQRSTVWY"):
-            return "Protein"
-        else:
-            raise ValueError("Cannot detect sequence type.")
+        sequence = sequence.upper()
+        try:
+            # Use SequenceValidation methods for detection and validation
+            sequence_type = SequenceValidation.detect_sequence_type(sequence)
+            if not SequenceValidation.validate(sequence, sequence_type):
+                raise ValueError(f"Invalid {sequence_type} sequence.")
+            return sequence_type
+        except ValueError as e:
+            raise ValueError(f"Sequence validation failed: {e}")
         
-    def fetch_sequence_ncbi(self, accession_id):
-        url = f"https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={accession_id}&report=fasta"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            sequence_data = "".join(response.text.splitlines()[1:])  # Remove header line
-            if not sequence_data:
-                raise ValueError("No sequence data found for the given NCBI accession ID.")
-            return sequence_data
-        except Exception as e:
-            raise ValueError(f"Error fetching sequence from NCBI: {str(e)}")
+class SequenceFetcher:
+    """
+    Fetch sequences from online resources like NCBI and UniProt.
+    """
+    BASE_URLS = {
+        "NCBI": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={id}&report=fasta",
+        "UniProt": "https://www.uniprot.org/uniprot/{id}.fasta"
+    }
+    HEADERS = {"User-Agent": "SeqMorphTool/1.0 (+https://github.com/your-repo)"}
 
-    def fetch_sequence_uniprot(self, uniprot_id):
-        url = f"https://www.uniprot.org/uniprot/{uniprot_id}.fasta"
+    @staticmethod
+    def fetch_sequence_ncbi(accession_id):
+        """
+        Fetch a sequence from NCBI using the accession ID.
+        :param accession_id: NCBI accession ID.
+        :return: The sequence string.
+        """
+        url = SequenceFetcher.BASE_URLS["NCBI"].format(id=accession_id)
+        return SequenceFetcher._fetch_sequence(url, "NCBI")
+
+    @staticmethod
+    def fetch_sequence_uniprot(uniprot_id):
+        """
+        Fetch a sequence from UniProt using the UniProt ID.
+        :param uniprot_id: UniProt ID.
+        :return: The sequence string.
+        """
+        url = SequenceFetcher.BASE_URLS["UniProt"].format(id=uniprot_id)
+        return SequenceFetcher._fetch_sequence(url, "UniProt")
+
+    @staticmethod
+    def _fetch_sequence(url, source):
+        """
+        Internal method to fetch and validate a sequence from a given URL.
+        :param url: URL to fetch the sequence.
+        :param source: Source name (e.g., 'NCBI', 'UniProt').
+        :return: The sequence string.
+        """
         try:
-            response = requests.get(url)
+            response = requests.get(url, headers=SequenceFetcher.HEADERS, timeout=10)
             response.raise_for_status()
-            sequence_data = "".join(response.text.splitlines()[1:])  # Remove header line
+
+            lines = response.text.splitlines()
+            if not lines or not lines[0].startswith(">"):
+                raise ValueError(f"Invalid FASTA format received from {source}.")
+            
+            sequence_data = "".join(lines[1:]).strip()
             if not sequence_data:
-                raise ValueError("No sequence data found for the given UniProt ID.")
+                raise ValueError(f"No sequence data found from {source}.")
             return sequence_data
-        except Exception as e:
-            raise ValueError(f"Error fetching sequence from UniProt: {str(e)}")
+        except requests.exceptions.Timeout:
+            raise ValueError(f"Request to {source} timed out.")
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f"Error fetching sequence from {source}: {str(e)}")

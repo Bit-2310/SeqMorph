@@ -1,188 +1,151 @@
 import random
 from protein_library import ProteinUtils
 from gene_library import GeneUtils
-from input_module import InputHandler
+from analysis import SequenceAnalysisReport
+
 class MutationUtils:
     """
     A utility class for handling mutations on sequences (DNA, RNA, Protein).
     """
     def __init__(self, sequence):
-        """
-        Initialize the MutationUtils class with a sequence.
-        Automatically determines the sequence type and initializes the mutation log.
-        """
-        self.sequence = sequence
+        self.sequence = sequence.upper()
         self.sequence_type = GeneUtils.detect_sequence_type(sequence)
         self.mutation_log = []  # Log of all mutations applied to this sequence
 
     def validate_sequence(self):
         """
-        Validate the sequence based on its type (DNA, RNA, or Protein).
-        :return: Boolean indicating whether the sequence is valid.
+        Validate the sequence using utility libraries.
         """
         if self.sequence_type in ["DNA", "RNA"]:
             return GeneUtils.validate(self.sequence)
         elif self.sequence_type == "Protein":
             return ProteinUtils.validate(self.sequence)
-        else:
-            raise ValueError(f"Unknown sequence type: {self.sequence_type}")
-
-    def count_ambiguities(self):
-        """
-        Count the number of ambiguous bases in the sequence.
-        :return: Integer count of ambiguous bases.
-        """
-        if self.sequence_type in ["DNA", "RNA"]:
-            return GeneUtils.count_ambiguities(self.sequence)
-        else:
-            raise ValueError("Ambiguities are not applicable for protein sequences.")
+        raise ValueError(f"Unknown sequence type: {self.sequence_type}")
 
     def apply_random_mutation(self, mutation_rate):
         """
-        Apply random mutations to the sequence and log them.
-        :param mutation_rate: Percentage of sequence to mutate.
-        :return: Mutated sequence.
+        Apply random mutations to the sequence.
         """
         if self.sequence_type in ["DNA", "RNA"]:
-            mutated_sequence = self._random_mutation_gene(self.sequence, mutation_rate)
+            mutated_sequence = GeneUtils.random_mutation(self.sequence, mutation_rate)
         elif self.sequence_type == "Protein":
             mutated_sequence = ProteinUtils.random_mutation(self.sequence, mutation_rate)
         else:
             raise ValueError(f"Unknown sequence type: {self.sequence_type}")
-        
-        # Log the mutation
-        self._log_mutation(
-            mutation_type="Random Mutation",
-            subtype=None,
-            original_sequence=self.sequence,
-            mutated_sequence=mutated_sequence,
-            mutation_rate=mutation_rate
-        )
-        
-        # Update the sequence with the mutated version
+
+        # Log mutation details along with sequence analysis
+        self._log_mutation("Random Mutation", None, self.sequence, mutated_sequence, mutation_rate)
         self.sequence = mutated_sequence
         return mutated_sequence
 
-    def translate(self, handle_ambiguity=True):
-        """
-        Translate the sequence if it is DNA or RNA.
-        :param handle_ambiguity: Whether to handle ambiguous bases during translation.
-        :return: Translated protein sequence.
-        """
-        if self.sequence_type in ["DNA", "RNA"]:
-            return GeneUtils.translate(self.sequence, handle_ambiguity)
-        else:
-            raise ValueError("Translation is only applicable to DNA or RNA sequences.")
-
-    def _random_mutation_gene(self, sequence, mutation_rate):
-        """
-        Apply random mutations to a DNA or RNA sequence.
-        Handles ambiguous bases during mutation.
-        :param sequence: DNA or RNA sequence.
-        :param mutation_rate: Percentage of sequence to mutate.
-        :return: Mutated sequence.
-        """
-        sequence = list(sequence.upper())
-        num_mutations = max(1, int(len(sequence) * mutation_rate / 100))
-
-        for _ in range(num_mutations):
-            position = random.randint(0, len(sequence) - 1)
-            original_base = sequence[position]
-            
-            if original_base in GeneUtils.AMBIGUITY_CODES:
-                possible_bases = GeneUtils.resolve_ambiguity(original_base)
-            else:
-                possible_bases = list(GeneUtils.TRANSITION_MAP.keys()) if random.random() < 0.5 else list(GeneUtils.TRANSVERSION_MAP.keys())
-            
-            possible_bases.remove(original_base)
-            sequence[position] = random.choice(possible_bases)
-        
-        return ''.join(sequence)
-
     def _log_mutation(self, mutation_type, subtype, original_sequence, mutated_sequence, mutation_rate=None, position=None):
         """
-        Log the details of a mutation.
-        :param mutation_type: The high-level mutation type (e.g., 'Point Mutation').
-        :param subtype: The specific mutation subtype (e.g., 'Missense').
-        :param original_sequence: The sequence before mutation.
-        :param mutated_sequence: The sequence after mutation.
-        :param mutation_rate: Mutation rate (for random mutations).
-        :param position: Position of the mutation (if applicable).
+        Log details of a mutation and include analysis metrics for both sequences.
         """
+        # Create analysis report for both original and mutated sequences
+        analysis_report = self._generate_analysis_report(original_sequence, mutated_sequence)
+
+        # Log mutation and analysis results
         mutation_entry = {
             "mutation_type": mutation_type,
             "subtype": subtype,
             "original_sequence": original_sequence,
             "mutated_sequence": mutated_sequence,
             "mutation_rate": mutation_rate,
-            "position": position
+            "position": position,
+            "analysis_report": analysis_report  # Include analysis results
         }
+
         self.mutation_log.append(mutation_entry)
+
+    def _generate_analysis_report(self, original_sequence, mutated_sequence):
+        """
+        Generate an analysis report comparing the original and mutated sequences.
+        """
+        original_analysis = SequenceAnalysisReport(original_sequence, self.sequence_type)
+        mutated_analysis = SequenceAnalysisReport(mutated_sequence, self.sequence_type)
+
+        # Compare the sequences and generate the comparison report
+        comparison_report = original_analysis.compare_with(mutated_analysis)
+        
+        return comparison_report
 
     def get_mutation_log(self):
         """
-        Retrieve the mutation log.
-        :return: List of mutation log entries.
+        Retrieve mutation logs.
         """
         return self.mutation_log
-    
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-Mutation Engine-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
 class MutationEngine:
-    mutation_log = []  # Log of all mutations performed
+    mutation_log = []  # Global mutation log
 
     class GeneMutations:
+        @staticmethod
+        def weighted_mutation(original_codon, candidate_codons, transition_weight, transversion_weight):
+            """
+            Perform weighted mutation using transition and transversion probabilities.
+            """
+            weights = [
+                transition_weight if GeneUtils.is_transition(original_codon, candidate) else transversion_weight
+                for candidate in candidate_codons
+            ]
+            return random.choices(candidate_codons, weights=weights, k=1)[0]
+
         class PointMutation:
             @staticmethod
             def silent(codon, transition_weight=0.7, transversion_weight=0.3):
+                """
+                Perform silent mutation.
+                """
                 amino_acid = GeneUtils.CODON_TABLE_DNA.get(codon)
                 if not amino_acid:
                     raise ValueError(f"Invalid codon: {codon}")
+
                 synonymous_codons = [
-                    key for key, value in GeneUtils.CODON_TABLE_DNA.items()
-                    if value == amino_acid and key != codon
+                    key for key, aa in GeneUtils.CODON_TABLE_DNA.items()
+                    if aa == amino_acid and key != codon
                 ]
                 if not synonymous_codons:
                     return codon  # No synonymous mutation possible
-                return MutationEngine.GeneMutations.PointMutation.weighted_mutation(
+
+                return MutationEngine.GeneMutations.weighted_mutation(
                     codon, synonymous_codons, transition_weight, transversion_weight
                 )
 
             @staticmethod
             def missense(codon, transition_weight=0.7, transversion_weight=0.3):
-                original_amino_acid = GeneUtils.CODON_TABLE_DNA.get(codon)
-                if not original_amino_acid:
+                """
+                Perform missense mutation.
+                """
+                amino_acid = GeneUtils.CODON_TABLE_DNA.get(codon)
+                if not amino_acid:
                     raise ValueError(f"Invalid codon: {codon}")
+
                 nonsynonymous_codons = [
-                    key for key, value in GeneUtils.CODON_TABLE_DNA.items()
-                    if value != original_amino_acid and value != 'STOP'
+                    key for key, aa in GeneUtils.CODON_TABLE_DNA.items()
+                    if aa != amino_acid and aa != 'STOP'
                 ]
                 if not nonsynonymous_codons:
                     return codon  # No missense mutation possible
-                return MutationEngine.GeneMutations.PointMutation.weighted_mutation(
+
+                return MutationEngine.GeneMutations.weighted_mutation(
                     codon, nonsynonymous_codons, transition_weight, transversion_weight
                 )
 
             @staticmethod
             def nonsense(codon, transition_weight=0.7, transversion_weight=0.3):
+                """
+                Perform nonsense mutation to introduce a stop codon.
+                """
                 if codon in GeneUtils.STOP_CODONS_DNA:
                     return codon  # Codon is already a stop codon
+
                 possible_stop_codons = list(GeneUtils.STOP_CODONS_DNA - {codon})
                 if not possible_stop_codons:
                     return codon  # No nonsense mutation possible
-                return MutationEngine.GeneMutations.PointMutation.weighted_mutation(
+
+                return MutationEngine.GeneMutations.weighted_mutation(
                     codon, possible_stop_codons, transition_weight, transversion_weight
                 )
-
-            @staticmethod
-            def weighted_mutation(original_codon, candidate_codons, transition_weight, transversion_weight):
-                weights = []
-                for candidate in candidate_codons:
-                    if GeneUtils.is_transition(original_codon, candidate):
-                        weights.append(transition_weight)
-                    else:
-                        weights.append(transversion_weight)
-                return random.choices(candidate_codons, weights=weights, k=1)[0]
 
         class InDels:
             @staticmethod
@@ -242,17 +205,27 @@ class MutationEngine:
                         })
                 return "".join(sequence)
 
-#     class ProteinMutations:
-#         class Missense:
-#             @staticmethod
-#             def conservative():
-#                 return None
+    class ProteinMutations:
+        class Missense:
+            @staticmethod
+            def conservative(protein_sequence, position):
+                """
+                Perform a conservative missense mutation.
+                """
+                amino_acid = protein_sequence[position]
+                conservative_aa = ProteinUtils.get_conservative_group(amino_acid)
+                if not conservative_aa:
+                    return protein_sequence  # No conservative group available
 
-#             @staticmethod
-#             def non_conservative():
-#                 return None
+                new_amino_acid = random.choice([aa for aa in conservative_aa if aa != amino_acid])
+                return protein_sequence[:position] + new_amino_acid + protein_sequence[position + 1:]
 
-#         class Frameshift:
-#             @staticmethod
-#             def test():
-#                 return None
+            @staticmethod
+            def non_conservative(protein_sequence, position):
+                """
+                Perform a non-conservative missense mutation.
+                """
+                amino_acid = protein_sequence[position]
+                all_amino_acids = ProteinUtils.ALL_AMINO_ACIDS
+                new_amino_acid = random.choice([aa for aa in all_amino_acids if aa != amino_acid])
+                return protein_sequence[:position] + new_amino_acid + protein_sequence[position + 1:]
