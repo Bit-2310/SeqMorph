@@ -1,17 +1,7 @@
 
 # **SeqMorph**
-
-   _____            __  __                  _       __        ___  
-  / ____|          |  \/  |                | |     /_ |      / _ \ 
- | (___   ___  __ _| \  / | ___  _ __ _ __ | |__    | |     | | | |
-  \___ \ / _ \/ _` | |\/| |/ _ \| '__| '_ \| '_ \   | |     | | | |
-  ____) |  __/ (_| | |  | | (_) | |  | |_) | | | |  | |  _  | |_| |
- |_____/ \___|\__, |_|  |_|\___/|_|  | .__/|_| |_|  |_| (_)  \___/ 
-                 | |                 | |                        
-                 |_|                 |_|                          
-
-SeqMorph is a powerful bioinformatics tool designed for simulating mutations in DNA, RNA, and protein sequences. It allows researchers to explore the impact of mutations on sequences and their biological functions through customizable mutation simulations and detailed analysis.
-
+SeqMorph is an advanced bioinformatics tool tailored for simulating mutations in DNA, RNA, and protein sequences. 
+It empowers researchers to investigate the effects of genetic variations on sequences and their biological functions through highly customizable mutation simulations and comprehensive analyses.
 ---
 
 ## **Key Features**
