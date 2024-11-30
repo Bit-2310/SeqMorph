@@ -1,7 +1,5 @@
-import matplotlib.pyplot as plt
 from collections import Counter
-from protein_library import ProteinUtils
-from gene_library import SequenceAnalysis
+from gene_library import SequenceAnalysis as SeqA
 
 class SequenceAnalysisReport:
     """
@@ -15,28 +13,19 @@ class SequenceAnalysisReport:
 
     def gc_content(self, sequence):
         """Calculate GC content of the sequence."""
-        return SequenceAnalysis.gc_content(sequence)
+        return SeqA.gc_content(sequence)
 
     def nucleotide_frequency(self, sequence):
         """Calculate nucleotide frequency."""
-        return SequenceAnalysis.nucleotide_frequency(sequence)
+        return SeqA.nucleotide_frequency(sequence)
 
     def kmer_frequency(self, sequence, k=3):
         """Calculate k-mer frequency."""
-        return SequenceAnalysis.kmer_count(sequence, k)
+        return SeqA.kmer_count(sequence, k)
 
     def orf_detection(self, sequence):
         """Detect Open Reading Frames (ORFs)."""
-        return SequenceAnalysis.orf_detection(sequence)
-
-    def protein_hydrophobicity(self, sequence):
-        """Calculate protein hydrophobicity."""
-        return ProteinUtils.hydrophobicity(sequence)
-
-    def amino_acid_composition(self, sequence):
-        """Calculate amino acid composition."""
-        sequence = sequence.upper()
-        return dict(Counter(sequence))
+        return SeqA.orf_detection(sequence)
 
     def compare_sequences(self):
         """Compare the metrics of normal vs mutated sequences and return a report."""
@@ -52,16 +41,6 @@ class SequenceAnalysisReport:
         normal_orfs = self.orf_detection(self.normal_sequence)
         mutated_orfs = self.orf_detection(self.mutated_sequence)
 
-        # Protein-specific analysis
-        if self.sequence_type == "Protein":
-            normal_hydrophobicity = self.protein_hydrophobicity(self.normal_sequence)
-            mutated_hydrophobicity = self.protein_hydrophobicity(self.mutated_sequence)
-            normal_aa_composition = self.amino_acid_composition(self.normal_sequence)
-            mutated_aa_composition = self.amino_acid_composition(self.mutated_sequence)
-        else:
-            normal_hydrophobicity = mutated_hydrophobicity = None
-            normal_aa_composition = mutated_aa_composition = None
-
         # Generate report comparing each metric
         report = {
             "GC Content": {"Normal": normal_gc, "Mutated": mutated_gc},
@@ -70,15 +49,15 @@ class SequenceAnalysisReport:
                 "Mutated": mutated_nucleotide_freq
             },
             "K-mer Frequency": {"Normal": normal_kmers, "Mutated": mutated_kmers},
-            "Open Reading Frames": {"Normal": normal_orfs, "Mutated": mutated_orfs},
-            "Hydrophobicity": {"Normal": normal_hydrophobicity, "Mutated": mutated_hydrophobicity},
-            "Amino Acid Composition": {"Normal": normal_aa_composition, "Mutated": mutated_aa_composition}
+            "Open Reading Frames": {"Normal": normal_orfs, "Mutated": mutated_orfs}
         }
 
         return report
 
     def plot_comparison(self, report):
         """Generate visual comparison of normal vs mutated sequence metrics."""
+        import matplotlib.pyplot as plt
+
         # GC Content Comparison
         plt.bar(['Normal', 'Mutated'], [report["GC Content"]["Normal"], report["GC Content"]["Mutated"]])
         plt.title('GC Content Comparison')
@@ -122,40 +101,3 @@ class SequenceAnalysisReport:
         plt.legend()
 
         plt.show()
-
-        # Protein Hydrophobicity Comparison
-        if report["Hydrophobicity"]["Normal"] is not None:
-            plt.bar(['Normal', 'Mutated'], [report["Hydrophobicity"]["Normal"], report["Hydrophobicity"]["Mutated"]])
-            plt.title('Hydrophobicity Comparison')
-            plt.ylabel('Hydrophobicity Score')
-            plt.show()
-
-        # Amino Acid Composition Comparison
-        if report["Amino Acid Composition"]["Normal"] is not None:
-            normal_aa = report["Amino Acid Composition"]["Normal"]
-            mutated_aa = report["Amino Acid Composition"]["Mutated"]
-            aa_labels = list(set(normal_aa).union(mutated_aa))  # Combine unique amino acids
-            normal_aa_counts = [normal_aa.get(aa, 0) for aa in aa_labels]
-            mutated_aa_counts = [mutated_aa.get(aa, 0) for aa in aa_labels]
-
-            plt.bar(aa_labels, normal_aa_counts, width=0.4, label='Normal', align='center')
-            plt.bar(aa_labels, mutated_aa_counts, width=0.4, label='Mutated', align='edge')
-            plt.title('Amino Acid Composition Comparison')
-            plt.ylabel('Frequency')
-            plt.xticks(rotation=90)
-            plt.legend()
-
-            plt.show()
-
-# Usage example
-normal_sequence = "ATGAAATAG"
-mutated_sequence = "ATGAGGTTAG"
-
-report = SequenceAnalysisReport(normal_sequence, mutated_sequence, sequence_type="DNA")
-comparison_report = report.compare_sequences()
-
-print("Sequence Analysis Report:")
-print(comparison_report)
-
-# Plot the comparisons visually
-report.plot_comparison(comparison_report)

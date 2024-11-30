@@ -1,13 +1,15 @@
+# input_module.py : Handles importing and storing sequences from files or online sources.
 import os
+import re
+import requests
 from Bio import SeqIO
 from tkinter import Tk, filedialog
-import requests
 from gene_library import SequenceValidation
-
 
 class InputHandler:
     """
-    Handles user input for sequences through file uploads or direct entry.
+    Handles user input for sequences through file uploads or direct entry, 
+    using a generator to handle large sequences and a hashmap for storage.
     """
     SUPPORTED_FILETYPES = [
         ("FASTA Files", "*.fasta"),
@@ -41,10 +43,10 @@ class InputHandler:
 
     def load_sequence_file(self, filepath):
         """
-        Load and parse a sequence file.
+        Load and parse a sequence file using a generator.
         Supports `.fasta` and `.txt` file formats.
         :param filepath: Path to the sequence file.
-        :return: List of sequences from the file.
+        :return: A generator yielding sequences from the file.
         """
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
@@ -61,33 +63,28 @@ class InputHandler:
         except Exception as e:
             raise ValueError(f"Error reading file {filepath}: {str(e)}")
 
-    @staticmethod
-    def _parse_fasta(filepath):
+    def _parse_fasta(self, filepath):
         """
-        Parse a FASTA file to extract sequences.
+        Generator to parse a FASTA file to yield sequences.
         :param filepath: Path to the FASTA file.
-        :return: List of sequences from the file.
+        :return: A generator yielding sequence strings.
         """
-        sequences = [str(record.seq) for record in SeqIO.parse(filepath, "fasta")]
-        if not sequences:
-            raise ValueError("No sequences found in the FASTA file.")
-        return sequences
+        for record in SeqIO.parse(filepath, "fasta"):
+            yield str(record.seq)
 
-    @staticmethod
-    def _parse_text(filepath):
+    def _parse_text(self, filepath):
         """
-        Parse a plain text file to extract a sequence.
+        Parse a plain text file to extract a single sequence.
         :param filepath: Path to the text file.
-        :return: List containing a single sequence.
+        :return: A list containing a single sequence.
         """
         with open(filepath, "r") as file:
             sequence = file.read().strip()
             if not sequence:
                 raise ValueError("No content found in the TXT file.")
-            return [sequence]
-        
-    @staticmethod
-    def sequence_type(sequence):
+            yield sequence  # Returning a generator
+
+    def sequence_type(self, sequence):
         """
         Determine the type of sequence (DNA, RNA, or Protein) and validate it.
         :param sequence: Input sequence string.
@@ -96,25 +93,52 @@ class InputHandler:
         sequence = sequence.upper()
         try:
             # Use SequenceValidation methods for detection and validation
-            sequence_type = SequenceValidation.detect_sequence_type(sequence)
-            if not SequenceValidation.validate(sequence, sequence_type):
-                raise ValueError(f"Invalid {sequence_type} sequence.")
-            return sequence_type
+            seq_type = SequenceValidation.detect_seq(sequence)
+            if not SequenceValidation.validate(sequence, seq_type):
+                raise ValueError(f"Invalid {seq_type} sequence.")
+            return seq_type
         except ValueError as e:
             raise ValueError(f"Sequence validation failed: {e}")
-        
 class SequenceFetcher:
     """
     Fetch sequences from online resources like NCBI and UniProt.
+    Sequences are stored in a hash map for efficient retrieval.
     """
     BASE_URLS = {
         "NCBI": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={id}&report=fasta",
         "UniProt": "https://www.uniprot.org/uniprot/{id}.fasta"
     }
-    HEADERS = {"User-Agent": "SeqMorphTool/1.0 (+https://github.com/your-repo)"}
+    HEADERS = {"User-Agent": "SeqMorphTool/1.0 (+https://github.com/Bit_2310/SeqMorph)"}
+
+    def __init__(self):
+        # Initialize an empty hash map (dictionary) to store sequences by their accession ID
+        self.sequence_map = {}
+
+    def fetch_sequence(self, accession_id):
+        """
+        Fetch a sequence from the appropriate source based on the accession ID.
+        Automatically detects whether it's from NCBI or UniProt.
+        :param accession_id: The accession ID (NCBI or UniProt).
+        :return: The sequence string.
+        """
+        if accession_id in self.sequence_map:
+            # If the sequence is already stored in the map, return it directly
+            return self.sequence_map[accession_id]
+        else:
+            # Otherwise, fetch the sequence from the source
+            if is_ncbi_accession(accession_id):
+                seq = self.fetch_from_ncbi(accession_id)
+            elif is_uniprot_accession(accession_id):
+                seq = self.fetch_from_uniprot(accession_id)
+            else:
+                raise ValueError(f"Invalid accession ID format: {accession_id}")
+            
+            # Store the fetched sequence in the hash map for future use
+            self.sequence_map[accession_id] = seq
+            return seq
 
     @staticmethod
-    def fetch_sequence_ncbi(accession_id):
+    def fetch_from_ncbi(accession_id):
         """
         Fetch a sequence from NCBI using the accession ID.
         :param accession_id: NCBI accession ID.
@@ -124,13 +148,13 @@ class SequenceFetcher:
         return SequenceFetcher._fetch_sequence(url, "NCBI")
 
     @staticmethod
-    def fetch_sequence_uniprot(uniprot_id):
+    def fetch_from_uniprot(accession_id):
         """
-        Fetch a sequence from UniProt using the UniProt ID.
-        :param uniprot_id: UniProt ID.
+        Fetch a sequence from UniProt using the accession ID.
+        :param accession_id: UniProt ID.
         :return: The sequence string.
         """
-        url = SequenceFetcher.BASE_URLS["UniProt"].format(id=uniprot_id)
+        url = SequenceFetcher.BASE_URLS["UniProt"].format(id=accession_id)
         return SequenceFetcher._fetch_sequence(url, "UniProt")
 
     @staticmethod
@@ -157,3 +181,12 @@ class SequenceFetcher:
             raise ValueError(f"Request to {source} timed out.")
         except requests.exceptions.RequestException as e:
             raise ValueError(f"Error fetching sequence from {source}: {str(e)}")
+
+# Helper functions for accession ID detection
+def is_ncbi_accession(accession_id):
+    """Check if an accession ID matches NCBI's pattern."""
+    return bool(re.match(r"^(NC_|NM_|NW_)[0-9]+", accession_id))
+
+def is_uniprot_accession(accession_id):
+    """Check if an accession ID matches UniProt's pattern."""
+    return bool(re.match(r"^[A-Za-z0-9]{6,}", accession_id))  # Adjust as per UniProt ID length

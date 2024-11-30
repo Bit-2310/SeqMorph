@@ -17,6 +17,42 @@ class SequenceValidation:
         "H": ["A", "C", "T"], "V": ["A", "C", "G"], "N": ["A", "C", "G", "T"]
     }
 
+    @staticmethod
+    def validate(sequence, seq_type="DNA"):
+        """
+        Validate a sequence based on the type (DNA, RNA, or Protein).
+        :param sequence: The sequence to validate.
+        :param seq_type: The type of the sequence ('DNA', 'RNA', or 'Protein').
+        :return: True if the sequence is valid.
+        """
+        sequence = sequence.upper()
+        if seq_type == "DNA":
+            return set(sequence).issubset(SequenceValidation.DNA_BASES.union(SequenceValidation.AMBIGUITY_CODES))
+        elif seq_type == "RNA":
+            return set(sequence).issubset(SequenceValidation.RNA_BASES.union(SequenceValidation.AMBIGUITY_CODES))
+        elif seq_type == "Protein":
+            return set(sequence).issubset(SequenceValidation.PROTEIN_BASES)
+        else:
+            raise ValueError(f"Unknown sequence type: {seq_type}")
+
+    @staticmethod
+    def detect_seq(sequence):
+        """
+        Detect the type of a sequence (DNA, RNA, Protein).
+        :param sequence: The sequence to detect.
+        :return: The type of sequence ('DNA', 'RNA', or 'Protein').
+        """
+        sequence = sequence.upper()
+        if set(sequence).issubset(SequenceValidation.DNA_BASES.union(SequenceValidation.AMBIGUITY_CODES)):
+            return "DNA"
+        elif set(sequence).issubset(SequenceValidation.RNA_BASES.union(SequenceValidation.AMBIGUITY_CODES)):
+            return "RNA"
+        elif set(sequence).issubset(SequenceValidation.PROTEIN_BASES):
+            return "Protein"
+        else:
+            raise ValueError("Invalid sequence: Cannot determine if DNA, RNA, or Protein.")
+
+
 class SequenceAnalysis:
     """
     Provides analytical methods for DNA, RNA, and Protein sequences.
@@ -57,6 +93,7 @@ class SequenceAnalysis:
                         break
         return orfs
 
+
 class GeneUtils:
     """
     Manages mutation-specific logic for DNA and RNA sequences.
@@ -76,3 +113,15 @@ class GeneUtils:
         """
         transversion_map = {"A": ["C", "T"], "G": ["C", "T"], "C": ["A", "G"], "T": ["A", "G"], "U": ["A", "G"]}
         return "".join(random.choice(transversion_map.get(base, [base])) for base in codon)
+    
+    @staticmethod
+    def is_valid_codon(codon, seq_type="DNA"):
+        """
+        Checks if the codon is valid based on the sequence type (DNA or RNA).
+        """
+        codon = codon.upper()
+        if seq_type == "DNA":
+            return codon in SequenceValidation.DNA_BASES
+        elif seq_type == "RNA":
+            return codon in SequenceValidation.RNA_BASES
+        return False
