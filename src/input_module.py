@@ -1,10 +1,12 @@
-# input_module.py : Handles importing and storing sequences from files or online sources.
 import os
 import re
+import json
 import requests
 from Bio import SeqIO
 from tkinter import Tk, filedialog
 from gene_library import SequenceValidation
+import logging
+from typing import Dict
 
 class InputHandler:
     """
@@ -100,79 +102,68 @@ class InputHandler:
         except ValueError as e:
             raise ValueError(f"Sequence validation failed: {e}")
 class SequenceFetcher:
-    """
-    Fetch sequences from online resources like NCBI and UniProt.
-    Sequences are stored in a hash map for efficient retrieval.
-    """
     BASE_URLS = {
         "NCBI": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={id}&report=fasta",
         "UniProt": "https://www.uniprot.org/uniprot/{id}.fasta"
     }
     HEADERS = {"User-Agent": "SeqMorphTool/1.0 (+https://github.com/Bit_2310/SeqMorph)"}
 
-    def __init__(self):
-        # Initialize an empty hash map (dictionary) to store sequences by their accession ID
-        self.sequence_map = {}
+    def __init__(self, cache_file="sequence_cache.json", timeout=10):
+        self.cache_file = cache_file
+        self.timeout = timeout
+        self.sequence_map = self._load_cache()
+
+        # Initialize cache file if it doesn't exist or is invalid
+        if not os.path.exists(self.cache_file) or not self.sequence_map:
+            self._save_cache()
+
+    def _load_cache(self) -> Dict:
+        if not os.path.exists(self.cache_file):
+            logging.info(f"Cache file {self.cache_file} not found. Initializing empty cache.")
+            return {}
+        try:
+            with open(self.cache_file, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            logging.warning(f"Invalid or empty cache file {self.cache_file}. Initializing empty cache. Error: {e}")
+            return {}
+
+    def _save_cache(self):
+        with open(self.cache_file, "w") as f:
+            json.dump(self.sequence_map, f)
 
     def fetch_sequence(self, accession_id):
-        """
-        Fetch a sequence from the appropriate source based on the accession ID.
-        Automatically detects whether it's from NCBI or UniProt.
-        :param accession_id: The accession ID (NCBI or UniProt).
-        :return: The sequence string.
-        """
         if accession_id in self.sequence_map:
-            # If the sequence is already stored in the map, return it directly
             return self.sequence_map[accession_id]
         else:
-            # Otherwise, fetch the sequence from the source
-            if is_ncbi_accession(accession_id):
-                seq = self.fetch_from_ncbi(accession_id)
-            elif is_uniprot_accession(accession_id):
-                seq = self.fetch_from_uniprot(accession_id)
-            else:
-                raise ValueError(f"Invalid accession ID format: {accession_id}")
-            
-            # Store the fetched sequence in the hash map for future use
+            seq = self._fetch_from_source(accession_id)
             self.sequence_map[accession_id] = seq
+            self._save_cache()
             return seq
 
-    @staticmethod
-    def fetch_from_ncbi(accession_id):
-        """
-        Fetch a sequence from NCBI using the accession ID.
-        :param accession_id: NCBI accession ID.
-        :return: The sequence string.
-        """
-        url = SequenceFetcher.BASE_URLS["NCBI"].format(id=accession_id)
-        return SequenceFetcher._fetch_sequence(url, "NCBI")
+    def _fetch_from_source(self, accession_id):
+        if is_ncbi_accession(accession_id):
+            return self.fetch_from_ncbi(accession_id)
+        elif is_uniprot_accession(accession_id):
+            return self.fetch_from_uniprot(accession_id)
+        else:
+            raise ValueError(f"Invalid accession ID format: {accession_id}")
 
-    @staticmethod
-    def fetch_from_uniprot(accession_id):
-        """
-        Fetch a sequence from UniProt using the accession ID.
-        :param accession_id: UniProt ID.
-        :return: The sequence string.
-        """
-        url = SequenceFetcher.BASE_URLS["UniProt"].format(id=accession_id)
-        return SequenceFetcher._fetch_sequence(url, "UniProt")
+    def fetch_from_ncbi(self, accession_id):
+        url = self.BASE_URLS["NCBI"].format(id=accession_id)
+        return self._fetch_sequence(url, "NCBI")
 
-    @staticmethod
-    def _fetch_sequence(url, source):
-        """
-        Internal method to fetch and validate a sequence from a given URL.
-        :param url: URL to fetch the sequence.
-        :param source: Source name (e.g., 'NCBI', 'UniProt').
-        :return: The sequence string.
-        """
+    def fetch_from_uniprot(self, accession_id):
+        url = self.BASE_URLS["UniProt"].format(id=accession_id)
+        return self._fetch_sequence(url, "UniProt")
+
+    def _fetch_sequence(self, url, source):
         try:
-            response = requests.get(url, headers=SequenceFetcher.HEADERS, timeout=10)
+            response = requests.get(url, headers=self.HEADERS, timeout=self.timeout)
             response.raise_for_status()
-
             lines = response.text.splitlines()
             if not lines or not lines[0].startswith(">"):
                 raise ValueError(f"Invalid FASTA format received from {source}.")
-            
             sequence_data = "".join(lines[1:]).strip()
             if not sequence_data:
                 raise ValueError(f"No sequence data found from {source}.")
@@ -182,11 +173,8 @@ class SequenceFetcher:
         except requests.exceptions.RequestException as e:
             raise ValueError(f"Error fetching sequence from {source}: {str(e)}")
 
-# Helper functions for accession ID detection
 def is_ncbi_accession(accession_id):
-    """Check if an accession ID matches NCBI's pattern."""
-    return bool(re.match(r"^(NC_|NM_|NW_)[0-9]+", accession_id))
+    return bool(re.match(r"^(AC_|NC_|NG_|NM_|NP_|NR_|NT_|NW_|XM_|XP_|XR_|YP_|ZP_)[0-9]+", accession_id))
 
 def is_uniprot_accession(accession_id):
-    """Check if an accession ID matches UniProt's pattern."""
-    return bool(re.match(r"^[A-Za-z0-9]{6,}", accession_id))  # Adjust as per UniProt ID length
+    return bool(re.match(r"^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}", accession_id))

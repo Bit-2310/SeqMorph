@@ -1,127 +1,110 @@
+import re
 import random
+from collections import defaultdict
 
 class SequenceValidation:
-    """
-    Handles validation and type detection for DNA, RNA, and ambiguous sequences.
-    """
+    DNA_REGEX = re.compile(r"^[ATGCRYSWKMBDHVN]+$", re.IGNORECASE)
+    RNA_REGEX = re.compile(r"^[AUGCRYSWKMBDHVN]+$", re.IGNORECASE)
+    PROTEIN_REGEX = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]+$", re.IGNORECASE)
+
     DNA_BASES = {"A", "T", "G", "C"}
     RNA_BASES = {"A", "U", "G", "C"}
     PROTEIN_BASES = {
         "A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M",
         "N", "P", "Q", "R", "S", "T", "V", "W", "Y"
     }
-    AMBIGUITY_CODES = {
-        "R": ["A", "G"], "Y": ["C", "T"], "S": ["G", "C"],
-        "W": ["A", "T"], "K": ["G", "T"], "M": ["A", "C"],
-        "B": ["C", "G", "T"], "D": ["A", "G", "T"],
-        "H": ["A", "C", "T"], "V": ["A", "C", "G"], "N": ["A", "C", "G", "T"]
-    }
 
     @staticmethod
-    def validate(sequence, seq_type="DNA"):
-        """
-        Validate a sequence based on the type (DNA, RNA, or Protein).
-        :param sequence: The sequence to validate.
-        :param seq_type: The type of the sequence ('DNA', 'RNA', or 'Protein').
-        :return: True if the sequence is valid.
-        """
-        sequence = sequence.upper()
+    def validate(sequence: str, seq_type: str = "DNA") -> bool:
         if seq_type == "DNA":
-            return set(sequence).issubset(SequenceValidation.DNA_BASES.union(SequenceValidation.AMBIGUITY_CODES))
+            return bool(SequenceValidation.DNA_REGEX.fullmatch(sequence))
         elif seq_type == "RNA":
-            return set(sequence).issubset(SequenceValidation.RNA_BASES.union(SequenceValidation.AMBIGUITY_CODES))
+            return bool(SequenceValidation.RNA_REGEX.fullmatch(sequence))
         elif seq_type == "Protein":
-            return set(sequence).issubset(SequenceValidation.PROTEIN_BASES)
-        else:
-            raise ValueError(f"Unknown sequence type: {seq_type}")
+            return bool(SequenceValidation.PROTEIN_REGEX.fullmatch(sequence))
+        raise ValueError(f"Unknown sequence type: {seq_type}")
 
     @staticmethod
-    def detect_seq(sequence):
-        """
-        Detect the type of a sequence (DNA, RNA, Protein).
-        :param sequence: The sequence to detect.
-        :return: The type of sequence ('DNA', 'RNA', or 'Protein').
-        """
-        sequence = sequence.upper()
-        if set(sequence).issubset(SequenceValidation.DNA_BASES.union(SequenceValidation.AMBIGUITY_CODES)):
+    def detect_seq(sequence: str) -> str:
+        if SequenceValidation.DNA_REGEX.fullmatch(sequence):
             return "DNA"
-        elif set(sequence).issubset(SequenceValidation.RNA_BASES.union(SequenceValidation.AMBIGUITY_CODES)):
+        elif SequenceValidation.RNA_REGEX.fullmatch(sequence):
             return "RNA"
-        elif set(sequence).issubset(SequenceValidation.PROTEIN_BASES):
+        elif SequenceValidation.PROTEIN_REGEX.fullmatch(sequence):
             return "Protein"
-        else:
-            raise ValueError("Invalid sequence: Cannot determine if DNA, RNA, or Protein.")
-
-
+        raise ValueError("Cannot determine sequence type")
 class SequenceAnalysis:
-    """
-    Provides analytical methods for DNA, RNA, and Protein sequences.
-    """
     @staticmethod
-    def gc_content(sequence):
-        gc_count = sum(1 for base in sequence.upper() if base in "GC")
-        return (gc_count / len(sequence)) * 100 if sequence else 0
-    
+    def gc_content(sequence: str) -> float:
+        gc = sequence.upper().count("G") + sequence.upper().count("C")
+        return (gc / len(sequence)) * 100 if sequence else 0.0
+
     @staticmethod
-    def nucleotide_frequency(sequence):
-        sequence = sequence.upper()
-        valid_bases = {"A", "T", "G", "C", "U"}
-        return {base: sequence.count(base) for base in valid_bases if base in sequence}
-    
+    def nucleotide_frequency(sequence: str) -> dict:
+        return {base: sequence.upper().count(base) for base in "ATGCU"}
+
     @staticmethod
-    def kmer_count(sequence, k=3):
+    def kmer_count(sequence: str, k: int = 3) -> dict:
         if len(sequence) < k:
-            raise ValueError("Sequence length is shorter than k-mer size.")
-        return {sequence[i:i + k]: sequence.count(sequence[i:i + k]) for i in range(len(sequence) - k + 1)}
+            raise ValueError("Sequence shorter than k-mer size")
+        kmers = defaultdict(int)
+        for i in range(len(sequence) - k + 1):
+            kmers[sequence[i:i+k].upper()] += 1
+        return kmers
 
     @staticmethod
-    def orf_detection(sequence):
-        """
-        Detects Open Reading Frames (ORFs) in a DNA or RNA sequence.
-        ORFs start with 'ATG' (start codon) and end with any stop codon.
-        """
-        start_codon = "ATG"
-        stop_codons = {"TAA", "TAG", "TGA"}
-        sequence = sequence.upper()
+    def orf_detection(sequence: str, seq_type: str = "DNA") -> list:
+        start_codons = {"ATG", "AUG"} if seq_type == "RNA" else {"ATG"}
+        stop_codons = {"TAA", "TAG", "TGA", "UAA", "UAG", "UGA"}
 
+        rev_seq = GeneUtils.reverse_complement(sequence, seq_type)
         orfs = []
-        for i in range(len(sequence) - 2):
-            if sequence[i:i + 3] == start_codon:
-                for j in range(i + 3, len(sequence) - 2, 3):
-                    if sequence[j:j + 3] in stop_codons:
-                        orfs.append(sequence[i:j + 3])
-                        break
+
+        for seq in [sequence, rev_seq]:
+            for frame in [0, 1, 2]:
+                frame_seq = seq[frame:]
+                for i in range(0, len(frame_seq)-2, 3):
+                    codon = frame_seq[i:i+3].upper()
+                    if codon in start_codons:
+                        for j in range(i+3, len(frame_seq)-2, 3):
+                            stop = frame_seq[j:j+3].upper()
+                            if stop in stop_codons:
+                                orfs.append(frame_seq[i:j+3])
+                                break
         return orfs
 
-
 class GeneUtils:
-    """
-    Manages mutation-specific logic for DNA and RNA sequences.
-    """
     @staticmethod
-    def transition(codon):
-        """
-        Performs a transition mutation (A ↔ G, C ↔ T/U).
-        """
+    def transition(codon: str) -> str:
+        if len(codon) != 3:
+            raise ValueError("Codon must be 3 bases")
+        pos = random.randint(0, 2)
+        base = codon[pos]
         transition_map = {"A": "G", "G": "A", "C": "T", "T": "C", "U": "C"}
-        return "".join(transition_map.get(base, base) for base in codon)
+        return codon[:pos] + transition_map.get(base, base) + codon[pos+1:]
 
     @staticmethod
-    def transversion(codon):
-        """
-        Performs a transversion mutation (A ↔ C/T, G ↔ C/T).
-        """
-        transversion_map = {"A": ["C", "T"], "G": ["C", "T"], "C": ["A", "G"], "T": ["A", "G"], "U": ["A", "G"]}
-        return "".join(random.choice(transversion_map.get(base, [base])) for base in codon)
-    
+    def transversion(codon: str) -> str:
+        if len(codon) != 3:
+            raise ValueError("Codon must be 3 bases")
+        pos = random.randint(0, 2)
+        base = codon[pos]
+        transversion_map = {
+            "A": ["C", "T"], "G": ["C", "T"],
+            "C": ["A", "G"], "T": ["A", "G"], "U": ["A", "G"]
+        }
+        new_base = random.choice(transversion_map.get(base, [base]))
+        return codon[:pos] + new_base + codon[pos+1:]
+
     @staticmethod
-    def is_valid_codon(codon, seq_type="DNA"):
-        """
-        Checks if the codon is valid based on the sequence type (DNA or RNA).
-        """
-        codon = codon.upper()
+    def is_valid_codon(codon: str, seq_type: str = "DNA") -> bool:
+        valid_bases = SequenceValidation.DNA_BASES if seq_type == "DNA" else SequenceValidation.RNA_BASES
+        return all(base.upper() in valid_bases for base in codon)
+
+    @staticmethod
+    def reverse_complement(sequence: str, seq_type: str = "DNA") -> str:
         if seq_type == "DNA":
-            return codon in SequenceValidation.DNA_BASES
+            return sequence.translate(str.maketrans("ATGC", "TACG"))[::-1]
         elif seq_type == "RNA":
-            return codon in SequenceValidation.RNA_BASES
-        return False
+            return sequence.translate(str.maketrans("AUGC", "UACG"))[::-1]
+        raise ValueError("Invalid sequence type")
