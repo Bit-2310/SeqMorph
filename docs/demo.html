@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SeqMorph Demo</title>
+  <meta name="description" content="Tiny demo for SeqMorph: mutate a sequence in-browser or via the local FastAPI backend." />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { brand: { DEFAULT: '#22C55E', dark: '#16A34A', alt: '#06B6D4' } },
+          fontFamily: { sans: ['ui-sans-serif','system-ui','-apple-system','Segoe UI','Inter','Roboto','Ubuntu','Cantarell','Noto Sans','Helvetica Neue','Arial'] },
+          boxShadow: { soft: '0 8px 30px rgba(2, 6, 23, 0.08)' }
+        }
+      }
+    }
+  </script>
+  <style>pre, code { font-variant-ligatures: none; } .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}</style>
+  <script>
+    // Persisted dark mode (shared with index.html)
+    (() => {
+      const key='seqmorph-theme';
+      const saved=localStorage.getItem(key);
+      const prefers=window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved ? saved==='dark' : prefers) document.documentElement.classList.add('dark');
+      window.__toggleTheme = () => {
+        const isDark=document.documentElement.classList.toggle('dark');
+        localStorage.setItem(key,isDark?'dark':'light');
+      };
+    })();
+  </script>
+</head>
+<body class="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 text-[15px] sm:text-base leading-relaxed">
+  <!-- Header -->
+  <header class="sticky top-0 z-40 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2 font-semibold tracking-tight">
+        <span class="text-2xl">🧬</span><span class="text-xl">SeqMorph</span><span class="text-slate-500">/ Demo</span>
+      </a>
+      <div class="flex items-center gap-3">
+        <a href="index.html#analysis" class="hidden sm:inline-flex items-center rounded-md px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 text-sm">Analysis</a>
+        <span id="apiBadge" class="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700">API: checking…</span>
+        <button class="text-xs rounded-md px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900" onclick="__toggleTheme()">Theme</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">Tiny mutation demo</h1>
+    <p class="mt-3 text-slate-600 dark:text-slate-300">
+      This page can mutate a sequence <strong>in-browser</strong> (no server) or, if detected, via your <strong>local FastAPI</strong> at
+      <code class="mono">http://127.0.0.1:8000</code>.
+    </p>
+
+    <!-- Controls -->
+    <section class="mt-8 grid md:grid-cols-5 gap-4 items-start">
+      <div class="md:col-span-3">
+        <label class="text-sm font-medium">Sequence (DNA)</label>
+        <textarea id="seq" rows="8" class="w-full mt-2 p-3 mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60"
+          placeholder="ATGACGT…"></textarea>
+        <div class="mt-2 text-xs text-slate-500">
+          Tip: leave empty to auto-generate a random 2,000bp sequence.
+        </div>
+      </div>
+
+      <div class="md:col-span-2 space-y-3">
+        <div>
+          <label class="text-sm font-medium">Structural rate (%)</label>
+          <input id="rate" type="number" class="w-full mt-1 p-2 rounded border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60" value="3" min="0" max="100">
+        </div>
+        <div>
+          <label class="text-sm font-medium">Mean segment length (nt)</label>
+          <input id="mean" type="number" class="w-full mt-1 p-2 rounded border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60" value="200" min="20">
+        </div>
+        <div>
+          <label class="text-sm font-medium">Seed (integer)</label>
+          <input id="seed" type="number" class="w-full mt-1 p-2 rounded border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60" value="123">
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-sm">
+          <label class="inline-flex items-center gap-2"><input id="opInv" type="checkbox" checked> Invert</label>
+          <label class="inline-flex items-center gap-2"><input id="opDup" type="checkbox" checked> Duplicate</label>
+          <label class="inline-flex items-center gap-2"><input id="opTrl" type="checkbox" checked> Translocate</label>
+        </div>
+        <div class="text-xs text-slate-500">
+          <label class="inline-flex items-center gap-2"><input id="useApi" type="checkbox"> Use local API if reachable</label>
+        </div>
+        <div class="flex gap-3">
+          <button id="runBtn" class="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">Mutate</button>
+          <button id="fillBtn" class="inline-flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Fill random</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="mt-10 grid md:grid-cols-2 gap-6">
+      <div class="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+        <h3 class="font-semibold">Original (first 300 bp)</h3>
+        <pre id="origView" class="mt-2 p-3 rounded bg-slate-50 dark:bg-slate-900 mono overflow-x-auto text-sm"></pre>
+        <div class="mt-2 text-xs" id="origStats"></div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+        <h3 class="font-semibold">Mutated (first 300 bp)</h3>
+        <pre id="mutView" class="mt-2 p-3 rounded bg-slate-50 dark:bg-slate-900 mono overflow-x-auto text-sm"></pre>
+        <div class="mt-2 text-xs" id="mutStats"></div>
+      </div>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+      <h3 class="font-semibold">Events</h3>
+      <pre id="events" class="mt-2 p-3 rounded bg-slate-50 dark:bg-slate-900 mono overflow-x-auto text-sm"></pre>
+      <div class="mt-2 text-xs text-slate-500">Client demo approximates engine behavior; backend stats may differ slightly.</div>
+    </section>
+
+    <div class="mt-10">
+      <a href="index.html" class="text-brand hover:text-brand-dark">&larr; Back to home</a>
+    </div>
+  </main>
+
+  <script>
+    // Seeded RNG (mulberry32)
+    function rngFromSeed(seed){
+      let a = (seed>>>0) || 1;
+      return function(){
+        a += 0x6D2B79F5; let t = Math.imul(a ^ (a>>>15), 1 | a);
+        t ^= t + Math.imul(t ^ (t>>>7), 61 | t);
+        return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+      };
+    }
+    const choice = (r, arr) => arr[Math.floor(r()*arr.length)];
+    const randint = (r, a, b) => Math.floor(a + r()*(b-a));
+    const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+    const gc = s => (s.match(/[GC]/g)||[]).length / Math.max(1,s.length);
+
+    // Simple diff preview (first 300 bp)
+    function previewDiff(a,b){
+      const L = 300;
+      const x = a.slice(0,L), y = b.slice(0,L);
+      let out = '', n = Math.min(x.length,y.length);
+      for(let i=0;i<n;i++){
+        if(x[i]===y[i]) out+=y[i];
+        else out+=`<span class="bg-yellow-300/40 dark:bg-yellow-600/30">${y[i]}</span>`;
+      }
+      if(y.length>n) out+=`<span class="bg-green-300/40 dark:bg-green-600/30">${y.slice(n)}</span>`;
+      return out || '(empty)';
+    }
+
+    // Structural mutations (client demo)
+    function mutateStructuralClient(seq, ratePct, meanSeg, ops, seed){
+      const r = rngFromSeed(seed||1);
+      const pickLen = ()=> clamp(Math.floor((meanSeg*0.5) + r()*meanSeg), 10, Math.max(10, Math.floor(seq.length*0.5)));
+      const totalBases = Math.floor(seq.length * (ratePct/100));
+      let events = Math.max(0, Math.floor(totalBases / Math.max(1, meanSeg)));
+      if (events === 0 && ratePct>0) events = 1;
+
+      let s = seq;
+      const evts = [];
+      const enabled = ops.filter(Boolean);
+      for(let k=0;k<events;k++){
+        const op = choice(r, enabled);
+        if(!op) break;
+        let start = randint(r, 0, Math.max(1, s.length-1));
+        let len = clamp(pickLen(), 10, Math.max(10, s.length - start));
+        const end = start + len;
+        const seg = s.slice(start, end);
+
+        if(op==='invert'){
+          const inv = seg.split('').reverse().join('');
+          s = s.slice(0,start) + inv + s.slice(end);
+        } else if(op==='duplicate'){
+          const insertPos = randint(r, 0, s.length);
+          s = s.slice(0,insertPos) + seg + s.slice(insertPos);
+        } else if(op==='translocate'){
+          if (seg.length<1) continue;
+          s = s.slice(0,start) + s.slice(end);
+          const insertPos = randint(r, 0, s.length);
+          s = s.slice(0,insertPos) + seg + s.slice(insertPos);
+        }
+        evts.push({op, start, end});
+      }
+      return {seq:s, events:evts};
+    }
+
+    // API detection
+    const API = "http://127.0.0.1:8000";
+    let apiUp = false;
+    async function checkApi(){
+      try{
+        const r = await fetch(API+"/health", {mode:"cors"});
+        apiUp = r.ok;
+      } catch { apiUp = false; }
+      const b = document.getElementById('apiBadge');
+      if(apiUp){ b.textContent="API: available"; b.className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-200"; }
+      else { b.textContent="API: not detected"; b.className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-700"; }
+      document.getElementById('useApi').checked = apiUp;
+    }
+
+    function randomDNA(n, r){ const A='ACGT'; let s=''; for(let i=0;i<n;i++) s+=A[Math.floor(r()*4)]; return s; }
+
+    // UI handlers
+    addEventListener('DOMContentLoaded', () => {
+      checkApi();
+
+      const fillBtn = document.getElementById('fillBtn');
+      fillBtn.addEventListener('click', () => {
+        const r = rngFromSeed(1);
+        document.getElementById('seq').value = randomDNA(2000, r);
+      });
+
+      const runBtn = document.getElementById('runBtn');
+      runBtn.addEventListener('click', async () => {
+        const seqEl = document.getElementById('seq');
+        let seq = (seqEl.value || '').toUpperCase().replace(/[^ACGT]/g,'');
+        if (!seq) { const r=rngFromSeed(1); seq = randomDNA(2000,r); seqEl.value = seq; }
+
+        const rate = Math.max(0, parseFloat(document.getElementById('rate').value||'0'));
+        const mean = Math.max(20, parseInt(document.getElementById('mean').value||'200',10));
+        const seed = parseInt(document.getElementById('seed').value||'1',10);
+        const useApi = document.getElementById('useApi').checked && apiUp;
+
+        // Show original
+        document.getElementById('origView').innerHTML = seq.slice(0,300);
+        document.getElementById('origStats').textContent = `Length: ${seq.length} | GC%: ${(100*gc(seq)).toFixed(2)}`;
+
+        if (useApi){
+          try {
+            // Add sequence
+            let res = await fetch(API+'/sequence/add', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({sequence: seq})});
+            const add = await res.json();
+            if (!res.ok) throw new Error(add?.detail || 'add failed');
+            const acc = add.accession_id;
+
+            // Mutate
+            res = await fetch(API+'/mutate-and-analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+              accession_id: acc, struct_rate: rate, mean_seg_len: mean, start: 1, seed: seed, save_outputs: false
+            })});
+            const mr = await res.json();
+            if (!res.ok) throw new Error(mr?.detail || 'mutate failed');
+
+            // We don’t get the mutated sequence back; show stats + counts
+            document.getElementById('mutView').innerHTML = '(mutated sequence not returned by API — see stats below)';
+            document.getElementById('mutStats').textContent = `Mutated length: ${mr.mutated_length} | Events: ${mr.num_events}`;
+            document.getElementById('events').textContent = JSON.stringify(mr.report || mr, null, 2);
+            return;
+          } catch (e){
+            document.getElementById('events').textContent = 'API error → falling back to client demo: ' + e;
+          }
+        }
+
+        // Client-side fallback
+        const ops = [
+          document.getElementById('opInv').checked ? 'invert' : null,
+          document.getElementById('opDup').checked ? 'duplicate' : null,
+          document.getElementById('opTrl').checked ? 'translocate' : null
+        ].filter(Boolean);
+
+        const out = mutateStructuralClient(seq, rate, mean, ops, seed);
+        document.getElementById('mutView').innerHTML = previewDiff(seq, out.seq);
+        document.getElementById('mutStats').textContent = `Length: ${out.seq.length} | GC%: ${(100*gc(out.seq)).toFixed(2)} | Events: ${out.events.length}`;
+        document.getElementById('events').textContent = JSON.stringify(out.events, null, 2);
+      });
+    });
+  </script>
+</body>
+</html>
