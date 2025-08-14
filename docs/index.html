@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SeqMorph • Scalable Mutation & Analysis</title>
+  <meta name="description" content="SeqMorph — store-first mutation engine & analysis toolkit for DNA/RNA/Protein. FastAPI backend, reproducible runs, and scalable sequence storage." />
+  <!-- Tailwind via CDN (no build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { brand: { DEFAULT: '#22C55E', dark: '#16A34A', alt: '#06B6D4' } },
+          fontFamily: { sans: ['ui-sans-serif','system-ui','-apple-system','Segoe UI','Inter','Roboto','Ubuntu','Cantarell','Noto Sans','Helvetica Neue','Arial'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Code block polish */
+    pre, code { font-variant-ligatures: none; }
+    .code-wrap { tab-size: 2; }
+  </style>
+  <script>
+    // Persisted dark mode
+    (() => {
+      const key = 'seqmorph-theme';
+      const saved = localStorage.getItem(key);
+      const prefers = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved ? saved === 'dark' : prefers) document.documentElement.classList.add('dark');
+      window.__toggleTheme = () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem(key, isDark ? 'dark' : 'light');
+      };
+    })();
+  </script>
+</head>
+<body class="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <!-- Header -->
+  <header class="sticky top-0 z-40 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="#top" class="flex items-center gap-2 font-semibold tracking-tight">
+        <span class="text-2xl">🧬</span><span class="text-xl">SeqMorph</span>
+      </a>
+      <!-- Mobile controls -->
+      <div class="md:hidden flex items-center gap-2">
+        <button class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 md:hidden" onclick="__toggleTheme()" title="Toggle dark mode" aria-label="Toggle theme">
+          <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="currentColor"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8 8 0 1 1-9.45-9.45A1 1 0 0 0 11 2a10 10 0 1 0 10 10 1 1 0 0 0-.36-.76Z"/></svg>
+          <svg class="w-4 h-4 dark:hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84 5.34 3.42A1 1 0 1 0 3.92 4.84l1.42 1.42A1 1 0 1 0 6.76 4.84ZM12 5a1 1 0 0 0 1-1V2a1 1 0 1 0-2 0v2a1 1 0 0 0 1 1Zm7.24-.16a1 1 0 0 0 1.41 0l1.42-1.42A1 1 0 0 0 20.65 2l-1.42 1.42a1 1 0 0 0 0 1.42ZM22 11h-2a1 1 0 0 0 0 2h2a1 1 0 1 0 0-2Zm-9 7a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-2a1 1 0 0 0-1-1ZM4 11H2a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2Zm1.76 8.16-1.42 1.42A1 1 0 1 0 4.84 22l1.42-1.42a1 1 0 0 0-1.41-1.41ZM19.16 19.16a1 1 0 0 0-1.41 0L16.33 20.6A1 1 0 0 0 17.74 22l1.42-1.42a1 1 0 0 0 0-1.42Z"/></svg>
+        </button>
+        <button class="inline-flex items-center justify-center rounded-md px-3 py-2 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900 md:hidden" aria-controls="mobileNav" aria-expanded="false" onclick="__toggleMenu()" title="Open menu" aria-label="Open menu">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a href="#install" class="hover:text-brand">Install</a>
+        <a href="#run" class="hover:text-brand">Run API</a>
+        <a href="#endpoints" class="hover:text-brand">Endpoints</a>
+        <a href="#smoke" class="hover:text-brand">Smoke Test</a>
+        <a href="#design" class="hover:text-brand">Design</a>
+        <a href="https://github.com/Bit-2310/SeqMorph" class="hover:text-brand inline-flex items-center gap-1.5" target="_blank" rel="noopener" aria-label="GitHub repository">
+  <img src="https://cdn.simpleicons.org/github" alt="GitHub" class="w-4 h-4 dark:invert"/>
+  <span>GitHub</span>
+</a>
+        <a href="https://www.linkedin.com/in/pranava-u" class="hover:text-brand inline-flex items-center gap-1.5" target="_blank" rel="noopener" aria-label="LinkedIn profile">
+  <svg class="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4m-2 2a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M2 9h4v12h-4z"/><path d="M9 9h4v2.5a4 4 0 0 1 7 3.5v6h-4v-6a2 2 0 0 0 -4 0v6h-4z"/></svg>
+  <span>LinkedIn</span>
+</a>
+<a href="mailto:pxu.bioinfo@gmail.com" class="hover:text-brand inline-flex items-center gap-1.5" aria-label="Email">
+  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2l8 5 8-5"/></svg>
+  <span>Email</span>
+</a>
+        <button class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900"
+                onclick="__toggleTheme()" title="Toggle dark mode" aria-label="Toggle theme">
+          <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="currentColor"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8 8 0 1 1-9.45-9.45A1 1 0 0 0 11 2a10 10 0 1 0 10 10 1 1 0 0 0-.36-.76Z"/></svg>
+          <svg class="w-4 h-4 dark:hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84 5.34 3.42A1 1 0 1 0 3.92 4.84l1.42 1.42A1 1 0 1 0 6.76 4.84ZM12 5a1 1 0 0 0 1-1V2a1 1 0 1 0-2 0v2a1 1 0 0 0 1 1Zm7.24-.16a1 1 0 0 0 1.41 0l1.42-1.42A1 1 0 0 0 20.65 2l-1.42 1.42a1 1 0 0 0 0 1.42ZM22 11h-2a1 1 0 0 0 0 2h2a1 1 0 1 0 0-2Zm-9 7a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-2a1 1 0 0 0-1-1ZM4 11H2a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2Zm1.76 8.16-1.42 1.42A1 1 0 1 0 4.84 22l1.42-1.42a1 1 0 0 0-1.41-1.41ZM19.16 19.16a1 1 0 0 0-1.41 0L16.33 20.6A1 1 0 0 0 17.74 22l1.42-1.42a1 1 0 0 0 0-1.42Z"/></svg>
+          <span class="text-xs">Theme</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+  <!-- Mobile menu -->
+  <div id="mobileNav" class="md:hidden hidden fixed inset-x-0 top-16 z-30 bg-white/95 dark:bg-slate-950/95 border-b border-slate-200 dark:border-slate-800">
+    <div class="px-4 py-4 flex flex-col gap-2 text-sm">
+      <a href="#install" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900">Install</a>
+      <a href="#run" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900">Run API</a>
+      <a href="#endpoints" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900">Endpoints</a>
+      <a href="#smoke" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900">Smoke Test</a>
+      <a href="#design" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900">Design</a>
+      <div class="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
+      <a href="https://github.com/Bit-2310/SeqMorph" target="_blank" rel="noopener" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900 inline-flex items-center gap-2">
+        <img src="https://cdn.simpleicons.org/github" alt="GitHub" class="w-5 h-5 dark:invert"/>
+        <span>GitHub</span>
+      </a>
+      <a href="https://www.linkedin.com/in/pranava-u" target="_blank" rel="noopener" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900 inline-flex items-center gap-2">
+        <svg class="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4m-2 2a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M2 9h4v12h-4z"/><path d="M9 9h4v2.5a4 4 0 0 1 7 3.5v6h-4v-6a2 2 0 0 0 -4 0v6h-4z"/></svg>
+        <span>LinkedIn</span>
+      </a>
+      <a href="mailto:pxu.bioinfo@gmail.com" class="px-2 py-2 rounded hover:bg-slate-100 dark:hover:bg-slate-900 inline-flex items-center gap-2">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2l8 5 8-5"/></svg>
+        <span>Email</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section id="top" class="relative overflow-hidden">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div class="grid md:grid-cols-2 gap-10 items-center">
+        <div>
+          <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+            Scalable mutation &amp; analysis for DNA/RNA/Protein
+          </h1>
+          <p class="mt-5 text-lg text-slate-600 dark:text-slate-300">
+            Store-first sequence editing (<em>StringStore</em>, <em>ChunkedStore</em>), deterministic structural mutations,
+            and a clean FastAPI backend—optimized for correctness, scalability, and reproducibility.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a href="http://127.0.0.1:8000/docs" class="inline-flex items-center justify-center rounded-lg bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-dark">Open API docs (local)</a>
+            <a href="https://github.com/Bit-2310/SeqMorph" target="_blank" rel="noopener"
+               class="inline-flex items-center justify-center rounded-lg border border-slate-300 dark:border-slate-700 px-5 py-2.5 font-medium hover:bg-slate-100 dark:hover:bg-slate-900">
+              View on GitHub
+            </a>
+          </div>
+          <div class="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Tip: start the server locally, then hit <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900">/docs</code> for interactive endpoints.
+          </div>
+        </div>
+        <div class="relative">
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 shadow-xl p-6">
+            <h3 class="text-sm uppercase tracking-widest text-slate-500 dark:text-slate-400">Pipeline</h3>
+            <pre class="code-wrap text-sm mt-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-900 overflow-auto">
+Sequence → <strong>SequenceStructure</strong> → <strong>BaseStore</strong> (StringStore / ChunkedStore)
+         → <strong>MutationEngine</strong> (invert/dup/translocate)
+         → <strong>Analysis</strong> (GC, k-mers, ORFs)
+         → FASTA + events.json + manifest.json + log</pre>
+            <div class="mt-4 grid grid-cols-3 gap-3 text-xs text-slate-600 dark:text-slate-300">
+              <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">O(log k) edits</div>
+              <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">Deterministic (seed)</div>
+              <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">Headless-safe</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="border-t border-slate-200 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Install</h2>
+      <p class="mt-3 text-slate-600 dark:text-slate-300">Requires Python 3.11+. Install dependencies from <code>requirements.txt</code>.</p>
+      <div class="mt-6 space-y-4">
+        <div class="relative">
+          <button class="copy absolute right-2 top-2 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#cmd-install">Copy</button>
+          <pre id="cmd-install" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code>pip install -r requirements.txt</code></pre>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="relative">
+            <button class="copy absolute right-2 top-2 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#cmd-run-linux">Copy</button>
+            <pre id="cmd-run-linux" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code># macOS/Linux
+export PYTHONPATH=./src
+python src/SeqMorph_Main.py
+# then open http://127.0.0.1:8000/docs</code></pre>
+          </div>
+          <div class="relative">
+            <button class="copy absolute right-2 top-2 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#cmd-run-win">Copy</button>
+            <pre id="cmd-run-win" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code># Windows PowerShell
+$env:PYTHONPATH = "$PWD\\src"
+python .\\src\\SeqMorph_Main.py
+# then open http://127.0.0.1:8000/docs</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Run & Endpoints -->
+  <section id="run" class="border-t border-slate-200 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Quick run &amp; minimal smoke</h2>
+      <p class="mt-3 text-slate-600 dark:text-slate-300">Add a short DNA sequence, then run structural mutations and view the report.</p>
+      <div class="mt-6 grid md:grid-cols-2 gap-6">
+        <div class="relative">
+          <span class="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Add sequence</span>
+          <button class="copy absolute right-2 top-6 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#cmd-add">Copy</button>
+          <pre id="cmd-add" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code>curl -X POST http://127.0.0.1:8000/sequence/add \
+  -H "Content-Type: application/json" \
+  -d '{"sequence":"ATGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT"}'</code></pre>
+        </div>
+        <div class="relative">
+          <span class="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Mutate & analyze</span>
+          <button class="copy absolute right-2 top-6 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#cmd-mutate">Copy</button>
+          <pre id="cmd-mutate" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code>curl -X POST http://127.0.0.1:8000/mutate-and-analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accession_id": "seq_1",
+    "struct_rate": 3.0,
+    "mean_seg_len": 200,
+    "start": 1,
+    "seed": 123,
+    "save_outputs": true
+  }' | python -m json.tool</code></pre>
+        </div>
+      </div>
+
+      <h3 id="endpoints" class="mt-12 text-xl md:text-2xl font-bold">Endpoints</h3>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-sm border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+          <thead class="bg-slate-50 dark:bg-slate-900">
+            <tr class="text-left">
+              <th class="p-3">Method</th><th class="p-3">Path</th><th class="p-3">Purpose</th><th class="p-3">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-t border-slate-200 dark:border-slate-800">
+              <td class="p-3 font-mono">GET</td><td class="p-3 font-mono">/health</td><td class="p-3">Liveness probe</td><td class="p-3">Returns <code>{"status":"ok"}</code></td>
+            </tr>
+            <tr class="border-t border-slate-200 dark:border-slate-800">
+              <td class="p-3 font-mono">POST</td><td class="p-3 font-mono">/sequence/add</td><td class="p-3">Add raw sequence</td><td class="p-3">Auto-detects type (DNA/RNA/Protein)</td>
+            </tr>
+            <tr class="border-t border-slate-200 dark:border-slate-800">
+              <td class="p-3 font-mono">POST</td><td class="p-3 font-mono">/sequence/fetch</td><td class="p-3">Fetch by accession</td><td class="p-3">NCBI/UniProt via <code>SequenceFetcher</code></td>
+            </tr>
+            <tr class="border-t border-slate-200 dark:border-slate-800">
+              <td class="p-3 font-mono">POST</td><td class="p-3 font-mono">/mutate-and-analyze</td><td class="p-3">Run structural mutations</td><td class="p-3">Returns full event list + analysis report</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Design -->
+  <section id="design" class="border-t border-slate-200 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight">Design highlights</h2>
+      <ul class="mt-6 grid md:grid-cols-2 gap-4 text-slate-700 dark:text-slate-300">
+        <li class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <strong>Store-first sequence model:</strong> callers work with a registry; backends implement <code>BaseStore</code> (get/set/insert/delete + invert/dup/translocate).
+        </li>
+        <li class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <strong>Deterministic mutations:</strong> one RNG per engine with an explicit <code>seed</code> ensures reproducibility.
+        </li>
+        <li class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <strong>Fast analysis:</strong> GC%, k-mers, entropy, ORFs/translation (RNA supported) without requiring a window system.
+        </li>
+        <li class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <strong>Audit-friendly outputs:</strong> optional manifest + per-event logs + FASTA &amp; events JSON.
+        </li>
+      </ul>
+      <div class="mt-8">
+        <a class="inline-flex items-center gap-2 text-brand hover:text-brand-dark" href="https://github.com/Bit-2310/SeqMorph" target="_blank" rel="noopener">
+          Contribute on GitHub
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none"><path d="M7 7h10v10M7 17 17 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Smoke test (DIY) -->
+  <section id="smoke" class="border-t border-slate-200 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl md:text-3xl font-bold tracking-tight">DIY smoke test</h2>
+      <p class="mt-3 text-slate-600 dark:text-slate-300">Quick sanity check without extra files.</p>
+      <div class="mt-6 grid md:grid-cols-2 gap-6">
+        <div class="relative">
+          <button class="copy absolute right-2 top-2 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#smoke-linux">Copy</button>
+          <pre id="smoke-linux" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code># macOS/Linux
+SEQ=$(python - <<'PY'
+import random; random.seed(1)
+print(''.join(random.choice('ACGT') for _ in range(20000)))
+PY
+)
+curl -s -X POST http://127.0.0.1:8000/sequence/add -H "Content-Type: application/json" -d "{\"sequence\":\"$SEQ\"}"
+curl -s -X POST http://127.0.0.1:8000/mutate-and-analyze -H "Content-Type: application/json" -d '{"accession_id":"seq_1","struct_rate":3.0,"mean_seg_len":200,"start":1,"seed":123,"save_outputs":true}' | python -m json.tool</code></pre>
+        </div>
+        <div class="relative">
+          <button class="copy absolute right-2 top-2 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-800" data-copy="#smoke-win">Copy</button>
+          <pre id="smoke-win" class="code-wrap p-4 rounded-xl bg-slate-50 dark:bg-slate-900 overflow-auto"><code># Windows PowerShell
+$seq = python - <<'PY'
+import random; random.seed(1)
+print(''.join(random.choice('ACGT') for _ in range(20000)))
+PY
+curl -s -X POST http://127.0.0.1:8000/sequence/add -H "Content-Type: application/json" -d "{\"sequence\":\"$seq\"}"
+curl -s -X POST http://127.0.0.1:8000/mutate-and-analyze -H "Content-Type: application/json" -d "{\"accession_id\":\"seq_1\",\"struct_rate\":3.0,\"mean_seg_len\":200,\"start\":1,\"seed\":123,\"save_outputs\":true}" | python -m json.tool</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-200 dark:border-slate-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 text-sm text-slate-600 dark:text-slate-400 flex items-center justify-between">
+      <span>© <span id="y"></span> SeqMorph</span>
+      <div class="flex items-center gap-4">
+  <a href="https://github.com/Bit-2310/SeqMorph" target="_blank" rel="noopener" aria-label="GitHub repository" class="hover:text-brand inline-flex items-center gap-1.5">
+    <img src="https://cdn.simpleicons.org/github" alt="GitHub" class="w-5 h-5 dark:invert"/>
+    <span class="hidden sm:inline">GitHub</span>
+  </a>
+  <a href="https://www.linkedin.com/in/pranava-u" target="_blank" rel="noopener" aria-label="LinkedIn profile" class="hover:text-brand inline-flex items-center gap-1.5">
+    <svg class="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4m-2 2a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M2 9h4v12h-4z"/><path d="M9 9h4v2.5a4 4 0 0 1 7 3.5v6h-4v-6a2 2 0 0 0 -4 0v6h-4z"/></svg>
+    <span class="hidden sm:inline">LinkedIn</span>
+  </a>
+  <a href="mailto:pxu.bioinfo@gmail.com" aria-label="Email" class="hover:text-brand inline-flex items-center gap-1.5">
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2l8 5 8-5"/></svg>
+    <span class="hidden sm:inline">Email</span>
+  </a>
+</div>
+    </div>
+  </footer>
+
+  <script>
+    // Copy-to-clipboard for code blocks
+    for (const btn of document.querySelectorAll('button.copy')) {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-copy');
+        const el = document.querySelector(id);
+        if (!el) return;
+        const text = el.innerText.replace(/\u00A0/g, ' ');
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Copied';
+          setTimeout(() => (btn.textContent = 'Copy'), 1400);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove();
+          btn.textContent = 'Copied';
+          setTimeout(() => (btn.textContent = 'Copy'), 1400);
+        }
+      });
+    }
+    // Mobile menu toggle
+    window.__toggleMenu = () => {
+      const m = document.getElementById('mobileNav');
+      if (!m) return;
+      const hidden = m.classList.toggle('hidden');
+      const btn = document.querySelector('[aria-controls="mobileNav"]');
+      if (btn) btn.setAttribute('aria-expanded', String(!hidden));
+    };
+    
+    // Year
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

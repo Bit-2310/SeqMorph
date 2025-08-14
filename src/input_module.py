@@ -1,106 +1,105 @@
 import os
 import re
 import json
+import logging
 import requests
 from Bio import SeqIO
-from tkinter import Tk, filedialog
-from gene_library import SequenceValidation
-import logging
-from typing import Dict
+from typing import Dict, Generator
+
+# Optional better GUI alternative
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+except ImportError:
+    tk = None  # fallback if GUI is not supported
+
+try:
+    import pyperclip
+except ImportError:
+    pyperclip = None
+
+from library import SequenceValidation
+
 
 class InputHandler:
     """
-    Handles user input for sequences through file uploads or direct entry, 
-    using a generator to handle large sequences and a hashmap for storage.
+    Handles sequence input from files, clipboard, or text, using generator parsing and validation.
     """
-    SUPPORTED_FILETYPES = [
-        ("FASTA Files", "*.fasta"),
-        ("Text Files", "*.txt"),
-        ("All Files", "*.*")
-    ]
+    SUPPORTED_EXTENSIONS = {".fasta", ".fa", ".txt"}
 
     def select_file(self):
-        """
-        Open a file dialog to select a single file.
-        :return: Path of the selected file.
-        """
-        root = Tk()
-        root.withdraw()  # Hide the root window
-        return filedialog.askopenfilename(
-            title="Select a Sequence File",
-            filetypes=self.SUPPORTED_FILETYPES
-        )
+        if not tk:
+            raise RuntimeError("Tkinter GUI is not supported in this environment.")
+        root = tk.Tk()
+        root.withdraw()
+        return filedialog.askopenfilename(filetypes=[("Sequence Files", "*.fasta *.fa *.txt")])
 
     def select_multiple_files(self):
-        """
-        Open a file dialog to select multiple files.
-        :return: List of paths for the selected files.
-        """
-        root = Tk()
-        root.withdraw()  # Hide the root window
-        return filedialog.askopenfilenames(
-            title="Select Sequence Files",
-            filetypes=self.SUPPORTED_FILETYPES
-        )
+        if not tk:
+            raise RuntimeError("Tkinter GUI is not supported in this environment.")
+        root = tk.Tk()
+        root.withdraw()
+        return filedialog.askopenfilenames(filetypes=[("Sequence Files", "*.fasta *.fa *.txt")])
 
-    def load_sequence_file(self, filepath):
-        """
-        Load and parse a sequence file using a generator.
-        Supports `.fasta` and `.txt` file formats.
-        :param filepath: Path to the sequence file.
-        :return: A generator yielding sequences from the file.
-        """
+    def load_sequence_file(self, filepath: str) -> Generator[str, None, None]:
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
 
-        file_extension = os.path.splitext(filepath)[1].lower()
-        if file_extension not in [".fasta", ".txt"]:
-            raise ValueError(f"Unsupported file format: {file_extension}")
+        if not os.access(filepath, os.R_OK):
+            raise PermissionError(f"Cannot read file: {filepath}")
+
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext not in self.SUPPORTED_EXTENSIONS:
+            raise ValueError(f"Unsupported file format: {ext}")
 
         try:
-            if file_extension == ".fasta":
+            if ext in [".fasta", ".fa"]:
                 return self._parse_fasta(filepath)
-            elif file_extension == ".txt":
-                return self._parse_text(filepath)
+            return self._parse_text(filepath)
         except Exception as e:
-            raise ValueError(f"Error reading file {filepath}: {str(e)}")
+            raise ValueError(f"Error while reading file: {e}")
 
-    def _parse_fasta(self, filepath):
-        """
-        Generator to parse a FASTA file to yield sequences.
-        :param filepath: Path to the FASTA file.
-        :return: A generator yielding sequence strings.
-        """
-        for record in SeqIO.parse(filepath, "fasta"):
-            yield str(record.seq)
+    def _parse_fasta(self, filepath: str) -> Generator[str, None, None]:
+        records = list(SeqIO.parse(filepath, "fasta"))
+        if not records:
+            raise ValueError("No sequences found in FASTA file.")
+        for record in records:
+            sequence = str(record.seq).replace("\n", "").replace(" ", "")
+            if len(sequence) < 10:
+                raise ValueError(f"Sequence in {record.id} is too short to be useful.")
+            yield sequence
 
-    def _parse_text(self, filepath):
-        """
-        Parse a plain text file to extract a single sequence.
-        :param filepath: Path to the text file.
-        :return: A list containing a single sequence.
-        """
-        with open(filepath, "r") as file:
-            sequence = file.read().strip()
-            if not sequence:
-                raise ValueError("No content found in the TXT file.")
-            yield sequence  # Returning a generator
+    def _parse_text(self, filepath: str) -> Generator[str, None, None]:
+        with open(filepath, "r") as f:
+            content = f.read().strip()
+            if not content:
+                raise ValueError("No content found in the text file.")
+            cleaned = content.replace("\n", "").replace(" ", "")
+            if len(cleaned) < 10:
+                raise ValueError("Sequence from text is too short.")
+            yield cleaned
 
-    def sequence_type(self, sequence):
-        """
-        Determine the type of sequence (DNA, RNA, or Protein) and validate it.
-        :param sequence: Input sequence string.
-        :return: The type of sequence ('DNA', 'RNA', 'Protein').
-        """
-        sequence = sequence.upper()
-        try:
-            # Use SequenceValidation methods for detection and validation
-            seq_type = SequenceValidation.detect_seq(sequence)
-            if not SequenceValidation.validate(sequence, seq_type):
-                raise ValueError(f"Invalid {seq_type} sequence.")
-            return seq_type
-        except ValueError as e:
-            raise ValueError(f"Sequence validation failed: {e}")
+    def read_from_clipboard(self) -> str:
+        if not pyperclip:
+            raise RuntimeError("pyperclip not installed. Install it via pip to use clipboard support.")
+        text = pyperclip.paste().strip()
+        if not text:
+            raise ValueError("Clipboard is empty.")
+        cleaned = text.replace("\n", "").replace(" ", "")
+        if not re.match(r"^[ACGTURYKMSWBDHVNacgturykmswbdhvnXx]+$", cleaned):
+            raise ValueError("Clipboard content does not appear to be a valid biological sequence.")
+        return cleaned
+
+    def sequence_type(self, sequence: str) -> str:
+        sequence = sequence.upper().replace(" ", "").replace("\n", "")
+        if len(sequence) < 10:
+            raise ValueError("Sequence is too short to classify.")
+        seq_type = SequenceValidation.detect_seq(sequence)
+        if not SequenceValidation.validate(sequence, seq_type):
+            raise ValueError(f"Invalid {seq_type} sequence.")
+        return seq_type
+
+
 class SequenceFetcher:
     BASE_URLS = {
         "NCBI": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={id}&report=fasta",
@@ -112,69 +111,63 @@ class SequenceFetcher:
         self.cache_file = cache_file
         self.timeout = timeout
         self.sequence_map = self._load_cache()
-
-        # Initialize cache file if it doesn't exist or is invalid
-        if not os.path.exists(self.cache_file) or not self.sequence_map:
+        if not self.sequence_map:
             self._save_cache()
 
     def _load_cache(self) -> Dict:
         if not os.path.exists(self.cache_file):
-            logging.info(f"Cache file {self.cache_file} not found. Initializing empty cache.")
             return {}
         try:
             with open(self.cache_file, "r") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            logging.warning(f"Invalid or empty cache file {self.cache_file}. Initializing empty cache. Error: {e}")
+        except Exception:
             return {}
 
     def _save_cache(self):
         with open(self.cache_file, "w") as f:
-            json.dump(self.sequence_map, f)
+            json.dump(self.sequence_map, f, indent=2)
 
-    def fetch_sequence(self, accession_id):
+    def fetch_sequence(self, accession_id: str) -> str:
         if accession_id in self.sequence_map:
             return self.sequence_map[accession_id]
-        else:
-            seq = self._fetch_from_source(accession_id)
-            self.sequence_map[accession_id] = seq
-            self._save_cache()
-            return seq
+        sequence = self._fetch_from_source(accession_id)
+        if len(sequence) < 10:
+            raise ValueError("Fetched sequence is unusually short. Please verify accession ID.")
+        self.sequence_map[accession_id] = sequence
+        self._save_cache()
+        return sequence
 
-    def _fetch_from_source(self, accession_id):
+    def _fetch_from_source(self, accession_id: str) -> str:
         if is_ncbi_accession(accession_id):
             return self.fetch_from_ncbi(accession_id)
         elif is_uniprot_accession(accession_id):
             return self.fetch_from_uniprot(accession_id)
-        else:
-            raise ValueError(f"Invalid accession ID format: {accession_id}")
+        raise ValueError(f"Unrecognized accession ID format: {accession_id}")
 
-    def fetch_from_ncbi(self, accession_id):
+    def fetch_from_ncbi(self, accession_id: str) -> str:
         url = self.BASE_URLS["NCBI"].format(id=accession_id)
         return self._fetch_sequence(url, "NCBI")
 
-    def fetch_from_uniprot(self, accession_id):
+    def fetch_from_uniprot(self, accession_id: str) -> str:
         url = self.BASE_URLS["UniProt"].format(id=accession_id)
         return self._fetch_sequence(url, "UniProt")
 
-    def _fetch_sequence(self, url, source):
+    def _fetch_sequence(self, url: str, source: str) -> str:
         try:
             response = requests.get(url, headers=self.HEADERS, timeout=self.timeout)
             response.raise_for_status()
             lines = response.text.splitlines()
             if not lines or not lines[0].startswith(">"):
-                raise ValueError(f"Invalid FASTA format received from {source}.")
-            sequence_data = "".join(lines[1:]).strip()
-            if not sequence_data:
-                raise ValueError(f"No sequence data found from {source}.")
-            return sequence_data
+                raise ValueError(f"Invalid FASTA format from {source}.")
+            return "".join(lines[1:]).strip()
         except requests.exceptions.Timeout:
-            raise ValueError(f"Request to {source} timed out.")
+            raise TimeoutError(f"Request to {source} timed out. Try again later.")
+        except requests.exceptions.HTTPError as e:
+            raise ValueError(f"{source} returned an error: {e.response.status_code} - {e.response.reason}")
         except requests.exceptions.RequestException as e:
-            raise ValueError(f"Error fetching sequence from {source}: {str(e)}")
-
-def is_ncbi_accession(accession_id):
+            raise ValueError(f"Failed to fetch sequence from {source}: {e}")
+def is_ncbi_accession(accession_id: str) -> bool:
     return bool(re.match(r"^(AC_|NC_|NG_|NM_|NP_|NR_|NT_|NW_|XM_|XP_|XR_|YP_|ZP_)[0-9]+", accession_id))
 
-def is_uniprot_accession(accession_id):
-    return bool(re.match(r"^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}", accession_id))
+def is_uniprot_accession(accession_id: str) -> bool:
+    return bool(re.match(r"^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]{5}$", accession_id))

@@ -1,5 +1,7 @@
-biopython
-numpy
-scipy
-matplotlib
-requests
+biopython>=1.83
+requests>=2.31
+fastapi>=0.110
+pydantic>=2.5
+uvicorn[standard]>=0.27
+scipy>=1.11
+matplotlib>=3.8
