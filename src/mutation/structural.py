@@ -4,7 +4,7 @@ import logging
 import random
 from typing import Dict, List, Tuple, Optional
 from .types import OpName, StructuralEvent
-from sequence_store import BaseStore
+from ..sequence_store import BaseStore
 
 
 log = logging.getLogger("seqmorph.mutation.structural")
