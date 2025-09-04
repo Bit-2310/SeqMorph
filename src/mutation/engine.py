@@ -4,19 +4,19 @@ import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from .types import StructuralEvent, OpName
-from .structural import sample_structural_events, apply_structural_events_on_store
-from .point import apply_point_mutations_on_store, ChooseBase
-from .context import ContextAwareChooser, ContextChooserConfig
+from mutation.types import StructuralEvent, OpName, ChooseBase
+from mutation.structural import sample_structural_events, apply_structural_events_on_store
+from mutation.point import apply_point_mutations_on_store
+from mutation.context import ContextAwareChooser, ContextChooserConfig
 # Optional: load JSON k-mer profiles (if you use models/)
 try:
-    from .model_loader import load_model  # noqa: F401
+    from mutation.model_loader import load_model  # noqa: F401
     _HAS_MODEL_LOADER = True
 except Exception:
     _HAS_MODEL_LOADER = False
 
 # IMPORTANT: use a relative import for BaseStore to avoid top-level shadowing
-from ..sequence_store.base import BaseStore
+from sequence_store.base import BaseStore
 
 
 @dataclass

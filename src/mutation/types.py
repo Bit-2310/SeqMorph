@@ -25,3 +25,12 @@ class StructuralEvent:
     start: int
     end: int
     insert_pos: Optional[int] = None
+
+
+import random
+from typing import Protocol
+
+class ChooseBase(Protocol):
+    """Policy callable for point mutations."""
+    def __call__(self, pos: int, current: str,
+                 prev: Optional[str], nxt: Optional[str], rng: random.Random) -> str: ...

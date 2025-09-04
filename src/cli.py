@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 from typing import Optional, List, Tuple, Dict, Any
 import json
-from .sequence_store.base import BaseStore
-from .runner import Runner
-from .mutation.context import ContextChooserConfig
+from sequence_store.base import BaseStore
+from runner import Runner
+from mutation.context import ContextChooserConfig
 
 
 # -------------------------- Banner / Colors --------------------------- #

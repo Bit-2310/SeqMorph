@@ -1,5 +1,5 @@
-from .validation import SequenceValidation
-from .analysis import SequenceAnalysis
-from .utils import GeneUtils
+from library.validation import SequenceValidation
+from library.analysis import SequenceAnalysis
+from library.utils import GeneUtils
 
 __all__ = ["SequenceValidation", "SequenceAnalysis", "GeneUtils"]

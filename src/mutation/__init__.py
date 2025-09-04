@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from .types import StructuralEvent, OpName
-from .structural import (
+from mutation.types import StructuralEvent, OpName
+from mutation.structural import (
     sample_structural_events,
     apply_structural_events_on_store,
 )
-from .point import apply_point_mutations_on_store
-from .engine import MutationEngine, MutationReport
+from mutation.point import apply_point_mutations_on_store
+from mutation.engine import MutationEngine, MutationReport
+from mutation.context import ContextChooserConfig
 
 __all__ = [
     "OpName",
@@ -16,4 +17,5 @@ __all__ = [
     "apply_point_mutations_on_store",
     "MutationEngine",
     "MutationReport",
+    "ContextChooserConfig",
 ]

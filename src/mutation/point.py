@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import random
-from typing import Iterable, Optional, Protocol
+from typing import Iterable, Optional
 
 from sequence_store import BaseStore
-
-
-
-class ChooseBase(Protocol):
-    """Policy callable for point mutations."""
-    def __call__(self, pos: int, current: str,
-                 prev: Optional[str], nxt: Optional[str], rng: random.Random) -> str: ...
+from mutation.types import ChooseBase
 
 
 def apply_point_mutations_on_store(

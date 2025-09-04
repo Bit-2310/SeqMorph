@@ -1,12 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Protocol, Dict, Tuple, Sequence, Mapping, Optional
+from typing import Dict, Tuple, Sequence, Mapping, Optional
 import random, bisect
 
-DNA: set[str] = {"A", "C", "G", "T", "N"}
+from mutation.types import ChooseBase
 
-class ChooseBase(Protocol):
-    def choose(self, left: str, base: str, right: str, rng: random.Random) -> str: ...
+DNA: set[str] = {"A", "C", "G", "T", "N"}
 
 def _sanitize(b: str) -> str:
     if not b: return "N"
@@ -84,11 +83,7 @@ class ContextAwareChooser(ChooseBase):
                 weights[b] *= r
 
     def __call__(self, pos: int, current: str, prev: Optional[str], nxt: Optional[str], rng: random.Random) -> str:
-        # Adapter: map the BaseStore-centric call to the k-mer context one
-        return self.choose(prev or "", current, nxt or "", rng)
-
-    def choose(self, left: str, base: str, right: str, rng: random.Random) -> str:
-        L = _sanitize(left); B = _sanitize(base); R = _sanitize(right)
+        L = _sanitize(prev or ""); B = _sanitize(current); R = _sanitize(nxt or "")
 
         # Lookup cascade: 5-mer -> 3-mer -> baseline(1-mer)
         # For 5-mer we synthesize N-L-B-R-N to avoid extra indexing

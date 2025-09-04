@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from typing import List
-from .base import BaseStore
+from sequence_store.base import BaseStore
 
 logger = logging.getLogger("seqmorph.store")
 

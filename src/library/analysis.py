@@ -2,8 +2,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Dict, Iterable, List, Optional, Literal, Tuple
 from math import log2
-from .validation import SequenceValidation
-from .utils import GeneUtils
+from library.validation import SequenceValidation
+from library.utils import GeneUtils
 
 class SequenceAnalysis:
     """Nucleotide and AA level analyses used by CLI/GUI/API."""

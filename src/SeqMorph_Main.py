@@ -19,10 +19,22 @@ from analysis_module import SequenceAnalysisReport
 from utils_run import prepare_run_dir, write_manifest, configure_file_logging, RunConfig
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
 # -----------------------------------------------------------------------------
 # App + globals
 # -----------------------------------------------------------------------------
 app = FastAPI(title="SeqMorph API", version="0.3")
+
+# Allow all origins for local file-based GUI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def _store_factory(seq: str):
     # Use ChunkedStore for longer inputs; tweak thresholds as you profile
@@ -179,10 +191,13 @@ def mutate_and_analyze(payload: MutateAnalyzeRequest) -> MutateAnalyzeResponse:
     end0 = max(0, min(n, end_1))
 
     # --- Mutations ---
+    # Use a seeded RNG for position sampling to make runs fully reproducible
+    rng = random.Random(payload.seed)
+
     chooser_cfg = ContextChooserConfig(
         ts_tv_ratio=float(payload.ti_tv_ratio), cpg_enabled=payload.use_cpg_bias
     )
-    eng = MutationEngine(seed=payload.seed, chooser_cfg=chooser_cfg)
+    eng = MutationEngine(rng=rng, chooser_cfg=chooser_cfg)
 
     # Point mutations
     num_pm = 0
@@ -190,7 +205,8 @@ def mutate_and_analyze(payload: MutateAnalyzeRequest) -> MutateAnalyzeResponse:
         win_len = end0 - start0
         num_to_mutate = int(win_len * (payload.point_rate / 100.0))
         if num_to_mutate > 0:
-            pos_to_mutate = random.sample(
+            # NB: k-sampling without replacement
+            pos_to_mutate = rng.sample(
                 range(start0, end0), k=min(num_to_mutate, win_len)
             )
             num_pm = eng.mutate_points(store, pos_to_mutate)
@@ -305,6 +321,6 @@ if __name__ == "__main__":
         "SeqMorph_Main:app",
         host="127.0.0.1",
         port=8000,
-        reload=True,    # handy during active dev; turn off in prod
+        reload=False,
         log_level="info",
     )
