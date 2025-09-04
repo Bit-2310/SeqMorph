@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time
 from collections import Counter
 from typing import Dict, Optional, Literal, List
@@ -13,7 +14,7 @@ from library import SequenceValidation
 from input_module import SequenceFetcher, is_ncbi_accession, is_uniprot_accession
 from sequence_structure import SequenceStructure
 from sequence_store import StringStore, ChunkedStore
-from mutation import MutationEngine
+from mutation import MutationEngine, ContextChooserConfig
 from analysis_module import SequenceAnalysisReport
 from utils_run import prepare_run_dir, write_manifest, configure_file_logging, RunConfig
 
@@ -56,6 +57,9 @@ class SequenceAddRequest(BaseModel):
 class MutateAnalyzeRequest(BaseModel):
     accession_id: str
     struct_rate: confloat(ge=0.0, le=100.0) = 0.0
+    point_rate: confloat(ge=0.0, le=100.0) = 0.0
+    ti_tv_ratio: confloat(ge=0.0) = 2.1
+    use_cpg_bias: bool = True
     mean_seg_len: conint(ge=1) = 500
     start: conint(ge=1)
     end: Optional[int] = None
@@ -66,6 +70,9 @@ class MutateAnalyzeRequest(BaseModel):
 class RunParams(BaseModel):
     window: List[int]
     struct_rate: float
+    point_rate: float
+    ti_tv_ratio: float
+    use_cpg_bias: bool
     mean_seg_len: int
     seed: Optional[int] = None
     store: str
@@ -84,6 +91,7 @@ class MutateAnalyzeResponse(BaseModel):
     mutated_length: int
     delta_length: int
     num_events: int
+    num_point_mutations: int
     struct_event_counts: Dict[str, int]
     struct_dup_length_added: int
     params: RunParams
@@ -170,8 +178,24 @@ def mutate_and_analyze(payload: MutateAnalyzeRequest) -> MutateAnalyzeResponse:
     start0 = max(0, min(n, start_1 - 1))
     end0 = max(0, min(n, end_1))
 
+    # --- Mutations ---
+    chooser_cfg = ContextChooserConfig(
+        ts_tv_ratio=float(payload.ti_tv_ratio), cpg_enabled=payload.use_cpg_bias
+    )
+    eng = MutationEngine(seed=payload.seed, chooser_cfg=chooser_cfg)
+
+    # Point mutations
+    num_pm = 0
+    if payload.point_rate > 0.0 and start0 < end0:
+        win_len = end0 - start0
+        num_to_mutate = int(win_len * (payload.point_rate / 100.0))
+        if num_to_mutate > 0:
+            pos_to_mutate = random.sample(
+                range(start0, end0), k=min(num_to_mutate, win_len)
+            )
+            num_pm = eng.mutate_points(store, pos_to_mutate)
+
     # Structural mutations (store-first)
-    eng = MutationEngine(seed=payload.seed)
     events = []
     if payload.struct_rate > 0.0 and start0 < end0:
         events = eng.mutate_structural(
@@ -206,10 +230,18 @@ def mutate_and_analyze(payload: MutateAnalyzeRequest) -> MutateAnalyzeResponse:
                 label="mut",
                 seed=payload.seed,
                 store=store.__class__.__name__,
-                rate_pct=float(payload.struct_rate),
+                struct_rate_pct=float(payload.struct_rate),
+                point_rate=float(payload.point_rate),
+                ti_tv_ratio=float(payload.ti_tv_ratio),
+                use_cpg_bias=payload.use_cpg_bias,
                 mean_seg_len=int(payload.mean_seg_len),
             ),
-            extra={"accession_id": acc, "num_events": len(events), "window": [start0, end0]},
+            extra={
+                "accession_id": acc,
+                "num_events": len(events),
+                "num_point_mutations": num_pm,
+                "window": [start0, end0],
+            },
         )
         # FASTA + events
         (run_dir / f"{acc}_original.fasta").write_text(
@@ -241,11 +273,15 @@ def mutate_and_analyze(payload: MutateAnalyzeRequest) -> MutateAnalyzeResponse:
         mutated_length=len(mutated),
         delta_length=delta_length,
         num_events=len(events),
+        num_point_mutations=num_pm,
         struct_event_counts=dict(counts),
         struct_dup_length_added=dup_added,
         params=RunParams(
             window=[start0, end0],
             struct_rate=float(payload.struct_rate),
+            point_rate=float(payload.point_rate),
+            ti_tv_ratio=float(payload.ti_tv_ratio),
+            use_cpg_bias=payload.use_cpg_bias,
             mean_seg_len=int(payload.mean_seg_len),
             seed=payload.seed,
             store=store.__class__.__name__,

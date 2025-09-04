@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Protocol, Dict, Tuple, Sequence, Mapping
+from typing import Protocol, Dict, Tuple, Sequence, Mapping, Optional
 import random, bisect
 
 DNA: set[str] = {"A", "C", "G", "T", "N"}
@@ -82,6 +82,10 @@ class ContextAwareChooser(ChooseBase):
         for b in list(weights.keys()):
             if self._is_transition(base, b):
                 weights[b] *= r
+
+    def __call__(self, pos: int, current: str, prev: Optional[str], nxt: Optional[str], rng: random.Random) -> str:
+        # Adapter: map the BaseStore-centric call to the k-mer context one
+        return self.choose(prev or "", current, nxt or "", rng)
 
     def choose(self, left: str, base: str, right: str, rng: random.Random) -> str:
         L = _sanitize(left); B = _sanitize(base); R = _sanitize(right)
