@@ -10,7 +10,10 @@ class RunConfig:
     label: str
     seed: Optional[int] = None
     store: str = "StringStore"
-    rate_pct: Optional[float] = None
+    struct_rate_pct: Optional[float] = None
+    point_rate: Optional[float] = None
+    ti_tv_ratio: Optional[float] = None
+    use_cpg_bias: Optional[bool] = None
     mean_seg_len: Optional[int] = None
 
 def prepare_run_dir(base: str = "output", label: str = "run") -> Path:
